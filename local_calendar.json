@@ -1,0 +1,72 @@
+{
+    "events": [
+        {
+            "id": "1",
+            "summary": "Daily Team Standup",
+            "start_time": "2025-05-19T09:15:00+01:00",
+            "end_time": "2025-05-19T09:30:00+01:00",
+            "description": "Quick team sync to discuss priorities and blockers",
+            "location": "Virtual Meeting Room 1",
+            "attendees": ["team@company.com"],
+            "status": "confirmed"
+        },
+        {
+            "id": "2",
+            "summary": "Project Planning Session",
+            "start_time": "2025-05-19T10:00:00+01:00",
+            "end_time": "2025-05-19T11:30:00+01:00",
+            "description": "Quarterly planning for Q3 initiatives",
+            "location": "Main Conference Room",
+            "attendees": ["product@company.com", "engineering@company.com"],
+            "status": "confirmed"
+        },
+        {
+            "id": "3",
+            "summary": "Client Demo",
+            "start_time": "2025-05-19T12:00:00+01:00",
+            "end_time": "2025-05-19T13:00:00+01:00",
+            "description": "Demo of new features to key client",
+            "location": "Virtual Meeting Room 2",
+            "attendees": ["client@clientcompany.com"],
+            "status": "confirmed"
+        },
+        {
+            "id": "4",
+            "summary": "Lunch Break",
+            "start_time": "2025-05-19T13:00:00+01:00",
+            "end_time": "2025-05-19T14:00:00+01:00",
+            "description": "Lunch break",
+            "status": "confirmed"
+        },
+        {
+            "id": "5",
+            "summary": "Technical Design Review",
+            "start_time": "2025-05-19T14:30:00+01:00",
+            "end_time": "2025-05-19T15:30:00+01:00",
+            "description": "Review of system architecture changes",
+            "location": "Engineering Room",
+            "attendees": ["tech-team@company.com"],
+            "status": "confirmed"
+        },
+        {
+            "id": "6",
+            "summary": "1:1 with Manager",
+            "start_time": "2025-05-19T16:00:00+01:00",
+            "end_time": "2025-05-19T16:30:00+01:00",
+            "description": "Weekly catch-up",
+            "location": "Manager's Office",
+            "attendees": ["manager@company.com"],
+            "status": "confirmed"
+        },
+        {
+            "id": "7",
+            "summary": "Team Retrospective",
+            "start_time": "2025-05-19T17:00:00+01:00",
+            "end_time": "2025-05-19T18:00:00+01:00",
+            "description": "Monthly team retrospective meeting",
+            "location": "Virtual Meeting Room 1",
+            "attendees": ["team@company.com"],
+            "status": "confirmed"
+        }
+    ]
+} 

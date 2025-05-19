@@ -4,6 +4,7 @@ import os
 from typing import Dict, List, Optional
 import numpy as np
 from dataclasses import dataclass, asdict
+from config import Config
 
 @dataclass
 class BreakFeedback:
@@ -15,18 +16,33 @@ class BreakFeedback:
     energy_level_after: Optional[int] = None    # 1-5 rating
     
 class UserPreferences:
-    def __init__(self, data_dir: str = "data"):
-        self.data_dir = data_dir
-        self.preferences_file = os.path.join(data_dir, "preferences.json")
-        self.break_history_file = os.path.join(data_dir, "break_history.json")
-        
-        # Create data directory if it doesn't exist
-        os.makedirs(data_dir, exist_ok=True)
+    _mocked_time: Optional[datetime] = None
+    
+    def __init__(self):
+        """Initialize user preferences with mock data directory."""
+        self.mock_data_dir = Config.get_mock_data_dir()
+        self.preferences_file = self.mock_data_dir / "preferences.json"
+        self.break_history_file = self.mock_data_dir / "break_history.json"
         
         # Load or initialize preferences
         self.preferences = self._load_preferences()
         self.break_history: List[BreakFeedback] = self._load_break_history()
         
+    @classmethod
+    def set_mocked_time(cls, mocked_time: Optional[datetime]):
+        """Set a mocked time for testing purposes."""
+        cls._mocked_time = mocked_time
+    
+    @classmethod
+    def get_current_time(cls) -> datetime:
+        """Get the current time, using mocked time if set."""
+        return cls._mocked_time if cls._mocked_time is not None else datetime.now(Config.get_timezone())
+    
+    @classmethod
+    def clear_mocked_time(cls):
+        """Clear any mocked time and return to using real time."""
+        cls._mocked_time = None
+    
     def _load_preferences(self) -> Dict:
         """Load user preferences from file or create default"""
         if os.path.exists(self.preferences_file):
@@ -68,7 +84,7 @@ class UserPreferences:
                         effectiveness_rating=item.get('effectiveness_rating'),
                         energy_level_after=item.get('energy_level_after')
                     )
-                    for item in data
+                    for item in data.get('history', [])
                 ]
         return []
     
@@ -78,10 +94,19 @@ class UserPreferences:
             json.dump(self.preferences, f, indent=2)
             
         with open(self.break_history_file, 'w') as f:
-            history_data = [asdict(item) for item in self.break_history]
-            # Convert datetime objects to ISO format strings
-            for item in history_data:
-                item['timestamp'] = item['timestamp'].isoformat()
+            history_data = {
+                'history': [
+                    {
+                        'break_type': item.break_type,
+                        'timestamp': item.timestamp.isoformat(),
+                        'accepted': item.accepted,
+                        'completed': item.completed,
+                        'effectiveness_rating': item.effectiveness_rating,
+                        'energy_level_after': item.energy_level_after
+                    }
+                    for item in self.break_history
+                ]
+            }
             json.dump(history_data, f, indent=2)
     
     def add_break_feedback(self, feedback: BreakFeedback):
@@ -98,30 +123,41 @@ class UserPreferences:
         
         self.save()
     
-    def get_optimal_break_type(self, time_of_day: datetime, activity_level: float) -> str:
+    def get_optimal_break_type(self, time_of_day: Optional[datetime] = None, activity_level: float = 0.5) -> str:
         """
         Determine the optimal break type based on time, activity, and past effectiveness
         
         Args:
-            time_of_day: Current datetime
+            time_of_day: Optional datetime to override current time (useful for testing)
             activity_level: Float between 0 and 1 indicating recent activity level
         """
+        # Use provided time, mocked time, or current time
+        current_time = time_of_day or self.get_current_time()
+        
         weights = self.preferences['break_type_weights'].copy()
         
         # Adjust weights based on time of day
-        hour = time_of_day.hour
+        hour = current_time.hour
         if 8 <= hour < 11:  # Morning
-            weights['eye_break'] *= 1.2  # More eye breaks in the morning
+            weights['eye_break'] *= 1.8     # Increased from 1.5
+            weights['stretch_break'] *= 1.1  # Reduced from 1.2
+            weights['walk_break'] *= 0.7     # Reduced from 0.8
+            weights['hydration_break'] *= 0.9  # Added reduction for hydration
         elif 14 <= hour < 17:  # Afternoon
-            weights['walk_break'] *= 1.3  # More walking in the afternoon
+            weights['walk_break'] *= 1.8     # Increased from 1.6
+            weights['stretch_break'] *= 1.2   # Reduced from 1.3
+            weights['eye_break'] *= 0.7      # Reduced from 0.8
+            weights['hydration_break'] *= 0.9  # Added reduction for hydration
         
         # Adjust based on activity level
         if activity_level > 0.7:  # High activity
             weights['walk_break'] *= 1.4
             weights['stretch_break'] *= 1.2
+            weights['eye_break'] *= 0.7      # Further reduce eye breaks during high activity
         elif activity_level < 0.3:  # Low activity
-            weights['eye_break'] *= 0.8
-            weights['hydration_break'] *= 1.2
+            weights['eye_break'] *= 1.2      # Increased from 0.8
+            weights['hydration_break'] *= 1.3 # Increased from 1.2
+            weights['walk_break'] *= 0.7      # Reduce walks during low activity
         
         # Convert weights to probabilities
         total_weight = sum(weights.values())

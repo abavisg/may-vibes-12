@@ -20,6 +20,7 @@ class Config:
     
     # Base Paths
     SECRETS_DIR = Path(os.getenv('SECRETS_DIR', 'secrets'))
+    MOCK_DATA_DIR = Path(os.getenv('MOCK_DATA_DIR', 'mock-data'))
     
     # Google Calendar Settings
     GOOGLE_CALENDAR_ENABLED = os.getenv('GOOGLE_CALENDAR_ENABLED', 'false').lower() == 'true'
@@ -42,7 +43,7 @@ class Config:
     DEFAULT_LUNCH_DURATION = int(os.getenv('DEFAULT_LUNCH_DURATION', '60'))
     
     # Local Calendar Settings
-    LOCAL_CALENDAR_FILE = os.getenv('LOCAL_CALENDAR_FILE', 'local_calendar.json')
+    LOCAL_CALENDAR_FILE = os.getenv('LOCAL_CALENDAR_FILE', 'local_calendar_current.json')
     
     @classmethod
     def get_oauth_redirect_uri(cls) -> str:
@@ -54,6 +55,12 @@ class Config:
         """Get the path to the secrets directory, creating it if it doesn't exist."""
         cls.SECRETS_DIR.mkdir(exist_ok=True)
         return cls.SECRETS_DIR
+    
+    @classmethod
+    def get_mock_data_dir(cls) -> Path:
+        """Get the path to the mock data directory, creating it if it doesn't exist."""
+        cls.MOCK_DATA_DIR.mkdir(exist_ok=True)
+        return cls.MOCK_DATA_DIR
     
     @classmethod
     def get_client_secret_path(cls) -> Path:
@@ -68,7 +75,7 @@ class Config:
     @classmethod
     def get_local_calendar_path(cls) -> Path:
         """Get the absolute path to the local calendar file."""
-        return cls.get_secrets_dir() / cls.LOCAL_CALENDAR_FILE
+        return cls.get_mock_data_dir() / cls.LOCAL_CALENDAR_FILE
     
     @classmethod
     def is_google_calendar_configured(cls) -> bool:

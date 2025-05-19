@@ -1,0 +1,19 @@
+{
+    "preferred_break_times": {
+        "morning": "10:30:00",
+        "lunch": "12:30:00",
+        "afternoon": "15:30:00"
+    },
+    "break_durations": {
+        "eye_break": 2,
+        "stretch_break": 5,
+        "walk_break": 10,
+        "hydration_break": 3
+    },
+    "break_type_weights": {
+        "eye_break": 1.0,
+        "stretch_break": 1.0,
+        "walk_break": 1.0,
+        "hydration_break": 1.0
+    }
+} 

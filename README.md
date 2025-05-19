@@ -111,9 +111,10 @@ The application includes an adaptive learning system that:
 │       └── icon.png     # Raster application icon
 ├── templates/            # HTML templates
 │   └── index.html       # Main application interface
-├── data/                # User data storage
-│   ├── preferences.json # User preferences
-│   └── break_history.json # Break history and feedback
+├── mock-data/           # Mock data for development
+│   ├── preferences.json # Default user preferences
+│   ├── break_history.json # Sample break records
+│   └── local_calendar_current.json # Sample calendar data
 └── secrets/             # Secure credentials storage
     ├── credentials.json # Google OAuth credentials
     └── token.json      # OAuth refresh token
@@ -127,7 +128,7 @@ python app.py
 ```
 
 2. Access the web interface:
-   - Open `http://localhost:5000` in your browser
+   - Open `http://localhost:5001` in your browser
    - Allow notifications when prompted
    - The interface will show:
      - Current work session duration
@@ -172,4 +173,12 @@ The application is built with modularity in mind:
 ## License
 
 MIT
+
+## Calendar Integration
+
+The application currently uses local calendar data for development and testing:
+- Sample calendar data is stored in `mock-data/local_calendar_current.json`
+- Calendar events are set in London timezone (Europe/London)
+- Events include typical workday schedule (9am-6pm)
+- Google Calendar integration is available but optional
 

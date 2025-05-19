@@ -147,7 +147,7 @@ def start_monitoring():
 if __name__ == '__main__':
     try:
         start_monitoring()
-        app.run(debug=True, use_reloader=False)  # use_reloader=False to prevent duplicate schedulers
+        app.run(debug=True, use_reloader=False, port=5001)  # use_reloader=False to prevent duplicate schedulers
     except KeyboardInterrupt:
         scheduler.shutdown()
         activity_tracker.stop() 

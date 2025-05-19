@@ -1,0 +1,36 @@
+{
+    "history": [
+        {
+            "break_type": "eye_break",
+            "timestamp": "2025-05-19T09:45:00+01:00",
+            "accepted": true,
+            "completed": true,
+            "effectiveness_rating": 4,
+            "energy_level_after": 4
+        },
+        {
+            "break_type": "stretch_break",
+            "timestamp": "2025-05-19T11:15:00+01:00",
+            "accepted": true,
+            "completed": true,
+            "effectiveness_rating": 5,
+            "energy_level_after": 5
+        },
+        {
+            "break_type": "walk_break",
+            "timestamp": "2025-05-19T14:15:00+01:00",
+            "accepted": true,
+            "completed": true,
+            "effectiveness_rating": 4,
+            "energy_level_after": 5
+        },
+        {
+            "break_type": "hydration_break",
+            "timestamp": "2025-05-19T15:45:00+01:00",
+            "accepted": true,
+            "completed": true,
+            "effectiveness_rating": 3,
+            "energy_level_after": 4
+        }
+    ]
+} 
