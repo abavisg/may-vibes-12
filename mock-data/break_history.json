@@ -103,6 +103,30 @@
       "completed": true,
       "effectiveness_rating": null,
       "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T19:02:25.453305+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T19:02:43.049461+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T19:07:04.178545+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
     }
   ]
 }

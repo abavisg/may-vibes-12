@@ -8,12 +8,22 @@
     "eye_break": 2,
     "stretch_break": 5,
     "walk_break": 10,
-    "hydration_break": 3
+    "hydration_break": 3,
+    "posture_break": 3,
+    "deep_breathing": 3,
+    "mindfulness": 5,
+    "nature_break": 5,
+    "creative_break": 7
   },
   "break_type_weights": {
     "eye_break": 1.0,
     "stretch_break": 1.0,
     "walk_break": 1.0,
-    "hydration_break": 1.0
+    "hydration_break": 1.0,
+    "posture_break": 1.0,
+    "deep_breathing": 1.0,
+    "mindfulness": 1.0,
+    "nature_break": 1.0,
+    "creative_break": 1.0
   }
 }

@@ -64,4 +64,28 @@ class ActivityTracker:
     
     def is_active(self) -> bool:
         """Check if the system is currently active."""
-        return self.get_activity_stats()["is_active"] 
+        return self.get_activity_stats()["is_active"]
+    
+    def get_focus_mode(self) -> str:
+        """Get the current focus mode. 
+        This is a placeholder method - could be enhanced in future to track different focus states.
+        """
+        # For now, just return a basic focus state based on system activity
+        stats = self.get_activity_stats()
+        if not stats["is_active"]:
+            return "idle"
+        
+        # Could add more sophisticated focus detection in the future
+        cpu = stats["cpu_percent"]
+        if cpu > 80:
+            return "intense"
+        elif cpu > 50:
+            return "focused"
+        else:
+            return "normal"
+    
+    def get_uptime_seconds(self) -> int:
+        """Get the number of seconds the activity tracker has been running."""
+        if not self.running:
+            return 0
+        return int(time.time() - self.last_activity) 

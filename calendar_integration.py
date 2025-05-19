@@ -295,5 +295,32 @@ class CalendarService:
             start = datetime.fromisoformat(event['start']).astimezone(self.timezone)
             end = datetime.fromisoformat(event['end']).astimezone(self.timezone)
             busy_times.append((start, end))
-            
-        return sorted(busy_times, key=lambda x: x[0]) 
+        
+        return sorted(busy_times, key=lambda x: x[0])
+
+    def get_status(self) -> Dict:
+        """Get status information about the calendar service."""
+        calendar_email = self.get_calendar_email()
+        mock_mode = self.mock_current_time is not None
+        
+        # Get today's events (or mocked today)
+        today_events = self.get_day_events()
+        next_event = self.get_next_event()
+        
+        next_event_minutes = None
+        if next_event:
+            try:
+                next_start = datetime.fromisoformat(next_event['start'])
+                next_event_minutes = (next_start - self.get_current_time()).total_seconds() // 60
+            except Exception:
+                pass
+        
+        return {
+            'connected': calendar_email is not None or not self.use_google_calendar,
+            'email': calendar_email,
+            'is_google_calendar': self.use_google_calendar,
+            'is_mock_mode': mock_mode,
+            'mock_date': self.mock_current_time.strftime('%Y-%m-%d') if mock_mode else None,
+            'events_today': len(today_events),
+            'next_event_in_minutes': next_event_minutes
+        } 

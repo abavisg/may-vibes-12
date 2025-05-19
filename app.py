@@ -12,6 +12,8 @@ from wellness_suggestions import WellnessSuggestions
 from wellness_score import WellnessScore
 from config import Config
 import logging
+import random
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -117,31 +119,19 @@ def emit_dashboard_update():
     })
 
 def get_dashboard_data():
-    """Get all dashboard data in a single call"""
+    """Get all data for the dashboard display"""
     current_time = calendar_service.get_current_time()
+    
+    # Get activity stats
     activity_stats = activity_tracker.get_activity_stats()
+    
+    # Calculate wellness metrics
     wellness_breakdown = wellness_score.get_score_breakdown()
     
-    # Check LLM status
-    try:
-        llm_status = wellness_suggestions.check_llm_status()
-    except Exception as e:
-        logger.error(f"Error checking LLM status: {e}")
-        llm_status = {
-            'is_available': False,
-            'model': 'Unknown',
-            'error': str(e)
-        }
+    system_info = get_system_info()
     
     return {
-        'system_info': {
-            'mock_mode': mock_mode_enabled,
-            'current_time': current_time.isoformat(),
-            'is_active': activity_stats['is_active'],
-            'formatted_date': current_time.strftime('%A, %B %d, %Y'),
-            'formatted_time': current_time.strftime('%I:%M:%S %p'),
-            'llm_status': llm_status
-        },
+        'system_info': system_info,
         'wellness_score': wellness_breakdown,
         'activity_stats': {
             'cpu_percent': activity_stats['cpu_percent'],
@@ -235,7 +225,7 @@ def handle_break_response():
         }), 500
 
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     """Handle Socket.IO connection"""
     logger.info("Client connected")
     emit_dashboard_update()
@@ -263,6 +253,66 @@ def start_monitoring():
         scheduler.start()
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
+
+def get_system_info():
+    """Get system information for the dashboard"""
+    current_time = datetime.now()
+    if mock_mode_enabled:
+        current_time = mock_time
+        
+    # Now using the properly implemented get_status() method
+    calendar_status = calendar_service.get_status()
+    
+    try:
+        llm_status = wellness_suggestions.check_llm_status()
+    except Exception as e:
+        logger.error(f"Error checking LLM status: {e}")
+        llm_status = {
+            'is_available': False,
+            'model': 'Unknown',
+            'error': str(e)
+        }
+    
+    # Get activity stats for display
+    activity_stats = activity_tracker.get_activity_stats()
+    
+    # Get break recommendations
+    break_rec = wellness_suggestions.check_work_patterns(
+        activity_stats.get('active_duration_minutes', 0),
+        activity_stats.get('idle_duration_minutes', 0),
+        activity_stats
+    )
+    should_break, suggestion, reason = break_rec
+    
+    # If a break is suggested, send it to the client
+    if should_break and suggestion:
+        socketio.emit('break_suggestion', suggestion)
+    
+    # Now using the properly implemented methods
+    focus_mode = activity_tracker.get_focus_mode()
+    
+    system_info = {
+        'time': current_time.strftime('%Y-%m-%d %H:%M:%S'),
+        'uptime': activity_tracker.get_uptime_seconds(),
+        'focus_mode': focus_mode,
+        'activity_level': activity_stats.get('activity_level', 0),
+        'active_duration': activity_stats.get('active_duration', 0),
+        'idle_duration': activity_stats.get('idle_duration', 0),
+        'calendar_status': calendar_status,
+        'mock_mode': mock_mode_enabled,
+        'llm_status': llm_status,
+        'break_check': {
+            'should_break': should_break,
+            'reason': reason,
+            'last_check': wellness_suggestions.last_check_time
+        },
+        'current_time': current_time.isoformat(),
+        'is_active': activity_stats['is_active'],
+        'formatted_date': current_time.strftime('%A, %B %d, %Y'),
+        'formatted_time': current_time.strftime('%I:%M:%S %p')
+    }
+    
+    return system_info
 
 if __name__ == '__main__':
     try:

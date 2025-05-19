@@ -11,7 +11,24 @@ class OllamaClient:
         """Initialize Ollama client with base URL"""
         self.base_url = base_url
         self.model = "tinyllama:latest"  # Using TinyLlama for faster prototyping
+        self.model_name = self.model.split(':')[0]  # Extract base model name
+        self.model_size = '1B'  # Default size for TinyLlama
         
+    def check_availability(self) -> bool:
+        """Check if Ollama is available and the model is loaded"""
+        try:
+            response = requests.get(f"{self.base_url}/api/tags", timeout=2)
+            response.raise_for_status()
+            
+            # Check if our model is in the list of models
+            models_data = response.json().get('models', [])
+            model_info = next((m for m in models_data if m.get('name') == self.model), None)
+            
+            return model_info is not None
+        except Exception as e:
+            logger.error(f"Error checking Ollama availability: {e}")
+            return False
+            
     def generate_break_suggestion(self, context: Dict) -> Dict:
         """
         Generate personalized break suggestions based on user context
@@ -24,6 +41,10 @@ class OllamaClient:
                 - activity_level: float
                 - wellness_score: float
                 - system_stats: Dict
+                - selected_break_type: str (optional)
+                - break_title: str (optional)
+                - break_suggestion: str (optional)
+                - break_duration: int (optional)
         """
         prompt = self._create_break_prompt(context)
         
@@ -83,7 +104,43 @@ class OllamaClient:
         activity_level = context['activity_level']
         wellness_score = context['wellness_score']
         
-        prompt = f"""As a wellness coach, suggest a break activity. Context:
+        # Check if we have a pre-selected break type
+        if 'selected_break_type' in context:
+            selected_type = context['selected_break_type']
+            break_title = context.get('break_title', 'Break')
+            suggested_activity = context.get('break_suggestion', '')
+            duration = context.get('break_duration', 5)
+            
+            # Enhanced prompt with pre-selected break type
+            prompt = f"""As a wellness coach, enhance this {selected_type} break suggestion. Context:
+Time: {time_of_day}
+Work duration: {active_duration} min
+Activity level: {activity_level:.2f}/1.0
+Current wellness: {wellness_score:.1f}
+
+Break suggestion details:
+- Type: {selected_type}
+- Title: {break_title}
+- Suggested activity: {suggested_activity}
+- Recommended duration: {duration} minutes
+
+Enhance this suggestion by adding personalization for the time of day and current activity level.
+Keep the same break type but make the suggestion more engaging and specific.
+
+Return JSON:
+{{
+    "title": "Brief descriptive title",
+    "activity": "Clear, actionable instructions",
+    "duration": {duration},
+    "benefits": ["health benefit 1", "health benefit 2"],
+    "type": "{selected_type}"
+}}
+"""
+        else:
+            # Original prompt format for open-ended suggestions
+            valid_types = "eye_break, stretch_break, posture_break, deep_breathing, mindfulness, walk_break, hydration_break, nature_break, creative_break"
+            
+            prompt = f"""As a wellness coach, suggest a break activity. Context:
 Time: {time_of_day}
 Work duration: {active_duration} min
 Activity: {activity_level:.2f}/1.0
@@ -98,7 +155,7 @@ Return JSON:
     "type": "break_type"
 }}
 
-Types: eye_break, stretch_break, walk_break, hydration_break
+Types: {valid_types}
 """
         return prompt
     
@@ -123,11 +180,18 @@ Give 2-3 short, actionable work-life balance tips.
             json_str = response.strip()
             if json_str.startswith("```json"):
                 json_str = json_str[7:-3]  # Remove ```json and ``` markers
-            
+            elif json_str.startswith("```"):
+                json_str = json_str[3:-3]  # Remove ``` markers
+                
             suggestion = json.loads(json_str)
             
             # Validate break type
-            valid_types = {'eye_break', 'stretch_break', 'walk_break', 'hydration_break'}
+            valid_types = {
+                'eye_break', 'stretch_break', 'posture_break', 'deep_breathing', 
+                'mindfulness', 'walk_break', 'hydration_break', 'nature_break', 
+                'creative_break'
+            }
+            
             if suggestion['type'] not in valid_types:
                 suggestion['type'] = 'stretch_break'
             

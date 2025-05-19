@@ -32,6 +32,10 @@
                         <i class="fas fa-brain"></i>
                         <span>LLM: Checking...</span>
                     </div>
+                    <div id="llmLastRun" style="display: inline-flex; align-items: center; gap: 5px; background-color: #20c997; color: white; padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <i class="fas fa-history"></i>
+                        <span>Last run: Never</span>
+                    </div>
                 </div>
                 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
@@ -193,6 +197,7 @@
 
         <div id="notification" class="notification hidden">
             <p id="notificationMessage"></p>
+            <p id="notificationTime" style="margin-top: 4px; font-size: 0.85em; opacity: 0.8;"></p>
             <div class="notification-actions">
                 <button class="btn primary" id="notificationAccept">Accept</button>
                 <button class="btn secondary" id="notificationDismiss">Dismiss</button>

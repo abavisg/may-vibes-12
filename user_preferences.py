@@ -47,7 +47,22 @@ class UserPreferences:
         """Load user preferences from file or create default"""
         if os.path.exists(self.preferences_file):
             with open(self.preferences_file, 'r') as f:
-                return json.load(f)
+                prefs = json.load(f)
+                
+                # Ensure all required fields are present
+                if 'break_durations' not in prefs:
+                    prefs['break_durations'] = self._get_default_break_durations()
+                if 'break_type_weights' not in prefs:
+                    prefs['break_type_weights'] = self._get_default_break_weights()
+                
+                # Add any missing break types
+                for break_type in self._get_default_break_weights().keys():
+                    if break_type not in prefs['break_type_weights']:
+                        prefs['break_type_weights'][break_type] = 1.0
+                    if break_type not in prefs['break_durations']:
+                        prefs['break_durations'][break_type] = self._get_default_break_durations()[break_type]
+                        
+                return prefs
         
         # Default preferences
         return {
@@ -56,18 +71,36 @@ class UserPreferences:
                 "lunch": time(12, 30).isoformat(),
                 "afternoon": time(15, 30).isoformat()
             },
-            "break_durations": {
-                "eye_break": 2,
-                "stretch_break": 5,
-                "walk_break": 10,
-                "hydration_break": 3
-            },
-            "break_type_weights": {
-                "eye_break": 1.0,
-                "stretch_break": 1.0,
-                "walk_break": 1.0,
-                "hydration_break": 1.0
-            }
+            "break_durations": self._get_default_break_durations(),
+            "break_type_weights": self._get_default_break_weights()
+        }
+        
+    def _get_default_break_durations(self) -> Dict[str, int]:
+        """Get default durations for all break types"""
+        return {
+            "eye_break": 2,
+            "stretch_break": 5,
+            "posture_break": 3,
+            "deep_breathing": 3,
+            "mindfulness": 5,
+            "walk_break": 10,
+            "hydration_break": 3,
+            "nature_break": 5,
+            "creative_break": 7
+        }
+        
+    def _get_default_break_weights(self) -> Dict[str, float]:
+        """Get default weights for all break types"""
+        return {
+            "eye_break": 1.0,
+            "stretch_break": 1.0,
+            "posture_break": 1.0,
+            "deep_breathing": 1.0,
+            "mindfulness": 1.0,
+            "walk_break": 1.0,
+            "hydration_break": 1.0,
+            "nature_break": 1.0,
+            "creative_break": 1.0
         }
     
     def _load_break_history(self) -> List[BreakFeedback]:

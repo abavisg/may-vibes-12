@@ -391,6 +391,15 @@ class WorkLifeBalanceApp {
 
     showNotification(message, isBreak = false) {
         this.notificationMessage.textContent = message;
+        
+        // Add timestamp to the notification
+        const notificationTime = document.getElementById('notificationTime');
+        if (notificationTime) {
+            const now = new Date();
+            notificationTime.textContent = `Suggested at ${now.toLocaleTimeString()}`;
+            notificationTime.setAttribute('title', now.toLocaleString());
+        }
+        
         this.notification.classList.remove('hidden');
         if (!isBreak) {
             setTimeout(() => this.notification.classList.add('hidden'), 5000);
@@ -494,12 +503,58 @@ class WorkLifeBalanceApp {
                 <span title="Last suggestion: ${suggestionTime}">LLM: ${model.split(':')[0]} ${modelSize}</span>
             `;
             llmStatusElement.style.backgroundColor = '#28a745';
+            
+            // Update the Last Run indicator
+            this.updateLlmLastRun(llmStatus.last_check);
         } else {
             llmStatusElement.innerHTML = `
                 <i class="fas fa-exclamation-triangle"></i>
                 <span>LLM: Unavailable</span>
             `;
             llmStatusElement.style.backgroundColor = '#dc3545';
+        }
+    }
+    
+    updateLlmLastRun(lastCheckTime) {
+        const llmLastRunElement = document.getElementById('llmLastRun');
+        if (!llmLastRunElement) return;
+        
+        if (!lastCheckTime) {
+            llmLastRunElement.innerHTML = `
+                <i class="fas fa-history"></i>
+                <span>Last run: Never</span>
+            `;
+            return;
+        }
+        
+        try {
+            const lastCheck = new Date(lastCheckTime);
+            const now = new Date();
+            const secondsAgo = Math.floor((now - lastCheck) / 1000);
+            
+            let timeString = 'Just now';
+            if (secondsAgo >= 60) {
+                const minutesAgo = Math.floor(secondsAgo / 60);
+                timeString = `${minutesAgo}m ago`;
+                
+                if (minutesAgo >= 60) {
+                    const hoursAgo = Math.floor(minutesAgo / 60);
+                    timeString = `${hoursAgo}h ago`;
+                }
+            } else if (secondsAgo > 5) {
+                timeString = `${secondsAgo}s ago`;
+            }
+            
+            llmLastRunElement.innerHTML = `
+                <i class="fas fa-history"></i>
+                <span title="${lastCheck.toLocaleString()}">Last run: ${timeString}</span>
+            `;
+        } catch (error) {
+            console.error('Error updating LLM last run time:', error);
+            llmLastRunElement.innerHTML = `
+                <i class="fas fa-history"></i>
+                <span>Last run: Unknown</span>
+            `;
         }
     }
 }
