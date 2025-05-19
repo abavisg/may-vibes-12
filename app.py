@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
 activity_tracker = ActivityTracker(idle_threshold_seconds=300)  # 5 minutes threshold
-calendar_service = CalendarService()
+calendar_service = CalendarService(use_google_calendar=False)  # Explicitly use local calendar
 wellness_suggestions = WellnessSuggestions()
 
 # Global variables for tracking state
@@ -88,7 +88,10 @@ def get_status():
 def get_calendar():
     """Get upcoming calendar events"""
     try:
+        logger.info("Fetching calendar events...")
         events = calendar_service.get_upcoming_events()
+        logger.info(f"Found {len(events)} upcoming events")
+        logger.debug(f"Events: {events}")
         return jsonify({"events": events})
     except Exception as e:
         logger.error(f"Error fetching calendar events: {e}")
@@ -147,7 +150,7 @@ def start_monitoring():
 if __name__ == '__main__':
     try:
         start_monitoring()
-        app.run(debug=True, use_reloader=False, port=5001)  # use_reloader=False to prevent duplicate schedulers
+        app.run(debug=True, use_reloader=False, port=5002)  # Changed port to 5002
     except KeyboardInterrupt:
         scheduler.shutdown()
         activity_tracker.stop() 

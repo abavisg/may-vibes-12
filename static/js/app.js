@@ -88,8 +88,9 @@ async function updateCalendar() {
         
         if (data.events && data.events.length > 0) {
             data.events.forEach(event => {
-                const startTime = new Date(event.start);
-                const endTime = new Date(event.end);
+                // Handle both formats (start/end and start_time/end_time)
+                const startTime = new Date(event.start || event.start_time);
+                const endTime = new Date(event.end || event.end_time);
                 
                 const eventElement = document.createElement('div');
                 eventElement.className = 'event-item';
@@ -104,8 +105,11 @@ async function updateCalendar() {
                 `;
                 eventsList.appendChild(eventElement);
             });
+            
+            console.log('Calendar updated with events:', data.events);
         } else {
             eventsList.innerHTML = '<div class="no-events">No upcoming events</div>';
+            console.log('No upcoming events found');
         }
     } catch (error) {
         console.error('Failed to update calendar:', error);

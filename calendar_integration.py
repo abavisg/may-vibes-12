@@ -9,6 +9,11 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 import pytz
 from config import Config
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class CalendarService:
     def __init__(self, use_google_calendar: Optional[bool] = None):
@@ -23,6 +28,8 @@ class CalendarService:
         self.calendar_id = Config.GOOGLE_CALENDAR_ID
         self.user_email = None
         self.timezone = Config.get_timezone()
+        
+        logger.debug(f"Calendar Service initialized with: use_google_calendar={self.use_google_calendar}, local_file={self.local_calendar_file}")
         
         if self.use_google_calendar and Config.is_google_calendar_configured():
             self._setup_google_calendar()
@@ -137,7 +144,9 @@ class CalendarService:
     
     def _get_local_calendar_events_for_range(self, start_time: datetime, end_time: datetime) -> List[Dict]:
         """Fetch events from local JSON calendar file for a specific time range."""
+        logger.debug(f"Checking local calendar file: {self.local_calendar_file}")
         if not os.path.exists(self.local_calendar_file):
+            logger.error(f"Local calendar file not found: {self.local_calendar_file}")
             return []
             
         try:
@@ -145,23 +154,74 @@ class CalendarService:
                 calendar_data = json.load(f)
             
             events = calendar_data.get('events', [])
+            logger.debug(f"Loaded {len(events)} events from local calendar")
             upcoming_events = []
             
-            for event in events:
-                event_start = datetime.fromisoformat(event['start_time']).astimezone(self.timezone)
-                if start_time <= event_start < end_time:
-                    upcoming_events.append(event)
+            # Ensure start_time and end_time are timezone-aware
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=self.timezone)
+            if end_time.tzinfo is None:
+                end_time = end_time.replace(tzinfo=self.timezone)
             
+            # Convert search range to London time for comparison
+            london_tz = pytz.timezone('Europe/London')
+            start_time_london = start_time.astimezone(london_tz)
+            end_time_london = end_time.astimezone(london_tz)
+            
+            logger.debug(f"Looking for events between {start_time_london} and {end_time_london} (London time)")
+            
+            for event in events:
+                try:
+                    # Parse event times (they're already in London time)
+                    event_start = datetime.fromisoformat(event['start_time'])
+                    event_end = datetime.fromisoformat(event['end_time'])
+                    
+                    # Add London timezone if not present
+                    if event_start.tzinfo is None:
+                        event_start = london_tz.localize(event_start)
+                    if event_end.tzinfo is None:
+                        event_end = london_tz.localize(event_end)
+                    
+                    logger.debug(f"Checking event: {event['summary']} at {event_start} (London time)")
+                    logger.debug(f"Time window check: {event_end} >= {start_time_london} and {event_start} <= {end_time_london}")
+                    
+                    # Compare times in London timezone - show events that:
+                    # 1. End after our start time (event hasn't finished yet)
+                    # 2. Start before our end time (event starts within our window)
+                    if event_end >= start_time_london and event_start <= end_time_london:
+                        # Convert to standard format (in local timezone for display)
+                        event_start_local = event_start.astimezone(self.timezone)
+                        event_end_local = event_end.astimezone(self.timezone)
+                        
+                        formatted_event = {
+                            'summary': event['summary'],
+                            'start': event_start_local.isoformat(),
+                            'end': event_end_local.isoformat(),
+                            'id': event['id'],
+                            'description': event.get('description', ''),
+                            'location': event.get('location', ''),
+                            'attendees': event.get('attendees', []),
+                            'status': event.get('status', 'confirmed')
+                        }
+                        upcoming_events.append(formatted_event)
+                        logger.debug(f"Added event: {event['summary']} at {event_start_local} (local time)")
+                except (ValueError, KeyError) as e:
+                    logger.error(f"Error processing event: {e}")
+                    continue
+            
+            logger.info(f"Found {len(upcoming_events)} upcoming events")
             return upcoming_events
             
         except (json.JSONDecodeError, KeyError, ValueError) as e:
-            print(f"Error reading local calendar: {str(e)}")
+            logger.error(f"Error reading local calendar: {str(e)}")
             return []
     
-    def get_upcoming_events(self, minutes_ahead: int = 30) -> List[Dict]:
+    def get_upcoming_events(self, minutes_ahead: int = 120) -> List[Dict]:
         """Get upcoming calendar events within the specified time window."""
         now = datetime.now(self.timezone)
         end_time = now + timedelta(minutes=minutes_ahead)
+        
+        logger.debug(f"Looking for events between {now} and {end_time} (local timezone)")
         
         if self.use_google_calendar:
             return self._get_google_calendar_events_for_range(now, end_time)
