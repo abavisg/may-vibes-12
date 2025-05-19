@@ -202,5 +202,67 @@ class UserPreferences:
         return np.random.choice(break_types, p=probabilities)
     
     def get_optimal_break_duration(self, break_type: str) -> int:
-        """Get the optimal break duration based on user preferences and history"""
-        return self.preferences['break_durations'][break_type] 
+        """Get the optimal duration for a given break type"""
+        return self.preferences['break_durations'].get(break_type, 5)  # Default to 5 minutes
+        
+    def get_recent_break_feedback(self, count: int = 1) -> List[BreakFeedback]:
+        """
+        Get the most recent break feedback entries
+        
+        Args:
+            count: Number of recent feedback entries to return
+        
+        Returns:
+            List of BreakFeedback objects, sorted with most recent first
+        """
+        # Sort by timestamp with most recent first
+        sorted_history = sorted(
+            self.break_history, 
+            key=lambda x: x.timestamp, 
+            reverse=True
+        )
+        
+        # Return up to 'count' entries
+        return sorted_history[:count]
+        
+    def get_upcoming_meetings(self, lookback_minutes: int = 15, lookahead_minutes: int = 60):
+        """
+        Mock method to generate upcoming meetings for the demo
+        In a real implementation, this would call out to the calendar service
+        """
+        current_hour = self.get_current_time().hour
+        
+        # Simulate some meetings on weekdays during work hours 
+        if self.get_current_time().weekday() < 5 and 9 <= current_hour <= 17:
+            # Morning standup
+            if 9 <= current_hour < 10:
+                meeting_time = datetime.combine(
+                    self.get_current_time().date(),
+                    time(10, 0)
+                ).replace(tzinfo=Config.get_timezone())
+                
+                if (meeting_time - self.get_current_time()).total_seconds() / 60 <= lookahead_minutes:
+                    return [{
+                        'title': 'Team Standup',
+                        'start': meeting_time.isoformat(),
+                        'end': (meeting_time + datetime.timedelta(minutes=30)).isoformat(),
+                        'duration': 30
+                    }]
+                    
+            # Afternoon sync
+            elif 14 <= current_hour < 15:
+                meeting_time = datetime.combine(
+                    self.get_current_time().date(),
+                    time(15, 0)
+                ).replace(tzinfo=Config.get_timezone())
+                
+                if (meeting_time - self.get_current_time()).total_seconds() / 60 <= lookahead_minutes:
+                    return [{
+                        'title': 'Project Sync',
+                        'start': meeting_time.isoformat(),
+                        'end': (meeting_time + datetime.timedelta(minutes=45)).isoformat(),
+                        'duration': 45
+                    }]
+        
+        # No meetings found in the time window
+        return [] 

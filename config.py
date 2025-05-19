@@ -3,10 +3,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 import pytz
 from datetime import datetime
+import logging
 
-# Load environment variables from .env file
-env_path = Path('.') / '.env'
-load_dotenv(dotenv_path=env_path)
+# Try to load .env file if dotenv is installed
+try:
+    load_dotenv()
+    logging.info("Loaded .env file")
+except ImportError:
+    logging.info("python-dotenv not installed, using existing environment variables")
 
 class Config:
     @staticmethod
@@ -25,11 +29,13 @@ class Config:
     
     # Mocking Settings
     MOCKING_ENABLED = os.getenv('MOCKING_ENABLED', 'true').lower() == 'true'
-    MOCKED_DATE = os.getenv('MOCKED_DATE', '2025-05-19')  # Format: YYYY-MM-DD
-    MOCKED_TIME = os.getenv('MOCKED_TIME', '09:00:00')    # Format: HH:MM:SS
+    MOCKED_DATE = os.getenv('MOCKED_DATE')
+    MOCKED_TIME = os.getenv('MOCKED_TIME')
     
     # Google Calendar Settings
-    USE_CALENDAR_INTEGRATION = os.getenv('USE_CALENDAR_INTEGRATION', 'false' if MOCKING_ENABLED else 'true').lower() == 'true'
+    USE_CALENDAR_INTEGRATION = os.getenv('USE_CALENDAR_INTEGRATION', 'false').lower() == 'true'
+    if MOCKING_ENABLED:
+        USE_CALENDAR_INTEGRATION = False
     GOOGLE_CLIENT_SECRET_FILE = os.getenv('GOOGLE_CLIENT_SECRET_FILE', 'client_secret.json')
     GOOGLE_TOKEN_FILE = os.getenv('GOOGLE_TOKEN_FILE', 'token.json')
     GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
@@ -51,16 +57,29 @@ class Config:
     # Local Calendar Settings
     LOCAL_CALENDAR_FILE = os.getenv('LOCAL_CALENDAR_FILE', 'local_calendar_current.json')
     
+    # Scheduler settings
+    SCHEDULER_FREQUENCY = int(os.getenv('SCHEDULER_FREQUENCY', '300'))  # Default to 300 seconds (5 minutes)
+    
+    @classmethod
+    def get_timezone(cls) -> pytz.timezone:
+        """Get the configured timezone as a pytz timezone object."""
+        return pytz.timezone(cls.TIMEZONE)
+    
     @classmethod
     def get_mock_time(cls) -> datetime:
-        """Get a datetime object based on the configured mock date and time."""
-        date_str = f"{cls.MOCKED_DATE} {cls.MOCKED_TIME}"
-        try:
-            # Parse the mock date and time, then localize to the configured timezone
-            naive_dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
-            return cls.get_timezone().localize(naive_dt)
-        except Exception as e:
-            print(f"Error creating mock time: {e}. Using current time.")
+        """Get the mock time from environment variables or current time"""
+        if cls.MOCKING_ENABLED:
+            # Create a datetime from the provided date and time, or use current time
+            date_str = cls.MOCKED_DATE or datetime.now().strftime('%Y-%m-%d')
+            time_str = cls.MOCKED_TIME or datetime.now().strftime('%H:%M:%S')
+            dt_str = f"{date_str} {time_str}"
+            mock_dt = datetime.strptime(dt_str, '%Y-%m-%d %H:%M:%S')
+            
+            # Add timezone
+            mock_dt = cls.get_timezone().localize(mock_dt)
+            return mock_dt
+        else:
+            # Return current time if mock mode is disabled
             return datetime.now(cls.get_timezone())
     
     @classmethod
@@ -101,9 +120,4 @@ class Config:
         client_secret_exists = cls.get_client_secret_path().exists()
         if not client_secret_exists:
             print(f"Warning: {cls.GOOGLE_CLIENT_SECRET_FILE} not found in {cls.SECRETS_DIR}")
-        return cls.USE_CALENDAR_INTEGRATION and client_secret_exists
-    
-    @classmethod
-    def get_timezone(cls) -> pytz.timezone:
-        """Get the configured timezone as a pytz timezone object."""
-        return pytz.timezone(cls.TIMEZONE) 
+        return cls.USE_CALENDAR_INTEGRATION and client_secret_exists 

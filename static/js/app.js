@@ -95,6 +95,17 @@ class WorkLifeBalanceApp {
         this.eventsList = document.getElementById('eventsList');
         this.notification = document.getElementById('notification');
         this.notificationMessage = document.getElementById('notificationMessage');
+        
+        // Initialize agent countdown elements
+        this.countdownTimer = document.getElementById('countdownTimer');
+        this.countdownProgress = document.getElementById('countdownProgress');
+        this.completedCycles = document.getElementById('completedCycles');
+        this.agentCountdown = document.getElementById('agentCountdown');
+        
+        // Initialize countdown interval
+        this.countdownInterval = null;
+        this.nextRunTime = null;
+        this.intervalDuration = 300; // default to 300 seconds (5 minutes), will be updated from server
 
         return true;
     }
@@ -166,9 +177,19 @@ class WorkLifeBalanceApp {
             }
             const data = await response.json();
             console.log('Received dashboard data:', data);
+            
+            // Check if scheduler info is present and has a valid next_run_at
+            if (data && data.scheduler_info && data.scheduler_info.next_run_at) {
+                console.log('Next run scheduled at:', new Date(data.scheduler_info.next_run_at * 1000).toLocaleString());
+            } else {
+                console.warn('Missing or invalid scheduler information in response');
+            }
+            
             this.updateDashboard(data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
+            // Retry after a short delay if fetch failed
+            setTimeout(() => this.fetchDashboardData(), 5000);
         }
     }
 
@@ -271,6 +292,9 @@ class WorkLifeBalanceApp {
         // Update meeting stats
         const meetingStats = data.meeting_stats;
         this.meetingsAttended.textContent = `${meetingStats.attended} / ${meetingStats.total}`;
+
+        // Update scheduler countdown
+        this.updateAgentCountdown(data.scheduler_info);
     }
 
     formatDuration(seconds) {
@@ -557,20 +581,140 @@ class WorkLifeBalanceApp {
             `;
         }
     }
+
+    updateAgentCountdown(schedulerInfo) {
+        if (!schedulerInfo || !this.countdownTimer || !this.countdownProgress || !this.completedCycles) {
+            console.warn('Missing scheduler info or countdown elements');
+            return;
+        }
+        
+        // Update completed cycles
+        if (this.completedCycles) {
+            this.completedCycles.textContent = schedulerInfo.runs_completed || 0;
+        }
+        
+        // Clear any existing countdown interval
+        if (this.countdownInterval) {
+            clearInterval(this.countdownInterval);
+        }
+        
+        // Get the next run time
+        const nextRunAt = schedulerInfo.next_run_at;
+        if (!nextRunAt) {
+            this.countdownTimer.textContent = "00:00";
+            this.countdownProgress.style.width = "0%";
+            return;
+        }
+        
+        // Set the next run time and update interval duration from server
+        this.nextRunTime = nextRunAt;
+        
+        // Update the interval duration if we have frequency information
+        if (schedulerInfo.frequency_seconds) {
+            this.intervalDuration = schedulerInfo.frequency_seconds;
+            console.log(`Updated interval duration from server frequency: ${this.intervalDuration} seconds`);
+            
+            // Display interval information
+            const intervalDisplay = document.getElementById('intervalDisplay');
+            if (intervalDisplay) {
+                const minutes = Math.floor(this.intervalDuration / 60);
+                const seconds = Math.floor(this.intervalDuration % 60);
+                intervalDisplay.textContent = `(interval: ${minutes}m ${seconds > 0 ? seconds + 's' : ''})`;
+            }
+        }
+        // Fallback to calculating from time_remaining if frequency not provided
+        else if (schedulerInfo.time_remaining) {
+            const totalRemainingSeconds = schedulerInfo.time_remaining.minutes * 60 + schedulerInfo.time_remaining.seconds;
+            // Store the full cycle interval for progress calculation (assuming we're at the start of a cycle)
+            if (totalRemainingSeconds > 0) {
+                this.intervalDuration = totalRemainingSeconds;
+                console.log(`Updated interval duration from time remaining: ${this.intervalDuration} seconds`);
+            }
+        }
+        
+        // Start a countdown that updates every second
+        this.countdownInterval = setInterval(() => {
+            const now = Math.floor(Date.now() / 1000);
+            const timeRemaining = Math.max(0, this.nextRunTime - now);
+            
+            if (timeRemaining <= 0) {
+                // If time is up, clear the interval and wait for the next update
+                clearInterval(this.countdownInterval);
+                this.countdownInterval = null;
+                this.countdownTimer.textContent = "00:00";
+                this.countdownProgress.style.width = "0%";
+                
+                // Make it blink when at zero
+                this.agentCountdown.classList.add('pulse');
+                setTimeout(() => {
+                    this.agentCountdown.classList.remove('pulse');
+                }, 5000);
+                
+                // Request a fresh update to get the new next run time
+                console.log("Timer reached zero, requesting fresh data...");
+                setTimeout(() => {
+                    this.fetchDashboardData();
+                }, 2000); // Wait 2 seconds to allow the backend to complete its cycle
+                
+                return;
+            }
+            
+            // Format the remaining time as MM:SS (no milliseconds)
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = Math.floor(timeRemaining % 60);
+            this.countdownTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Calculate progress bar width (0-100%)
+            const elapsedTime = this.intervalDuration - timeRemaining;
+            const elapsedPercent = Math.min(100, (elapsedTime / this.intervalDuration) * 100);
+            this.countdownProgress.style.width = `${elapsedPercent}%`;
+            
+            // Change color based on remaining time
+            if (timeRemaining < 30) {
+                this.countdownTimer.style.color = '#dc3545'; // Red for imminent
+                this.countdownProgress.style.backgroundColor = '#dc3545';
+            } else if (timeRemaining < 60) {
+                this.countdownTimer.style.color = '#fd7e14'; // Orange for soon
+                this.countdownProgress.style.backgroundColor = '#fd7e14';
+            } else {
+                this.countdownTimer.style.color = '#4a90e2'; // Blue for normal
+                this.countdownProgress.style.backgroundColor = '#4a90e2';
+            }
+        }, 1000);
+        
+        // Run it once immediately to set initial values
+        const now = Math.floor(Date.now() / 1000);
+        const timeRemaining = Math.max(0, this.nextRunTime - now);
+        const minutes = Math.floor(timeRemaining / 60);
+        const seconds = Math.floor(timeRemaining % 60);
+        this.countdownTimer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    }
+}
+
+// Add a CSS class for the pulse animation
+function addStyleToHead() {
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .pulse {
+            animation: pulse 1s infinite;
+        }
+    `;
+    document.head.appendChild(style);
 }
 
 // Initialize the application
 let app;
 function initApp() {
-    if (!app) {
-        app = new WorkLifeBalanceApp();
-        window.app = app; // Export for debugging
-    }
+    console.log('Initializing application...');
+    addStyleToHead();
+    app = new WorkLifeBalanceApp();
+    window.app = app; // Export for debugging
 }
 
-// Ensure initialization happens after script loads
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initApp);
-} else {
-    initApp();
-} 
+// Start the application when the DOM is loaded
+document.addEventListener('DOMContentLoaded', initApp); 

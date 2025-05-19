@@ -6,6 +6,13 @@ import logging
 import requests
 import numpy as np
 from typing import Dict, List, Optional, Tuple
+import math
+import os
+import urllib3
+
+from config import Config
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
 
@@ -333,41 +340,85 @@ class WellnessSuggestions:
         return np.random.choice(break_types, p=probabilities)
 
     def check_llm_status(self) -> dict:
-        """Check if the LLM is available and return its status"""
+        """Check if the LLM is available and return status info"""
         try:
-            # Try to ping the Ollama API
-            response = requests.get(f"{self.ollama.base_url}/api/tags", timeout=2)
-            response.raise_for_status()
+            # Check if Ollama is responding
+            ollama_host = 'localhost' if not hasattr(self.ollama, 'host') or not self.ollama.host else self.ollama.host
+            ollama_port = '11434'  # Standard Ollama port
+            
+            # Log attempt
+            logger.info(f"Checking Ollama availability at http://{ollama_host}:{ollama_port}/api/tags")
+            
+            # Set a timeout for the request to avoid hanging
+            response = requests.get(f'http://{ollama_host}:{ollama_port}/api/tags', timeout=3)
+            
+            # Log response status
+            logger.info(f"Ollama API response status: {response.status_code}")
+            
+            # Attempt to parse the response
+            response_data = response.json()
+            logger.info(f"Found {len(response_data.get('models', []))} models from Ollama API")
             
             # Find our model in the response
-            models_data = response.json().get('models', [])
+            models_data = response_data.get('models', [])
             model_info = next((m for m in models_data if m.get('name') == self.ollama.model), None)
             
             if model_info:
+                # Get frequency in minutes for display
+                frequency_seconds = Config.SCHEDULER_FREQUENCY
+                frequency_minutes = frequency_seconds / 60
+                
                 return {
                     'is_available': True,
                     'model': self.ollama.model,
                     'model_size': model_info.get('details', {}).get('parameter_size', 'Unknown'),
                     'last_check': datetime.now().isoformat(),
                     'last_suggestion': self.last_suggestion_time.isoformat() if self.last_suggestion_time else None,
-                    'check_interval': '5 minutes',
+                    'check_interval': f'{int(frequency_minutes)} minutes',
                     'suggestion_threshold': '45 minutes of activity'
                 }
             else:
+                # Model not found but API is available
+                logger.warning(f"Ollama is running but model '{self.ollama.model}' not found. Available models: {[m.get('name') for m in models_data]}")
                 return {
-                    'is_available': True,
+                    'is_available': False,
                     'model': self.ollama.model,
                     'model_size': 'Unknown',
                     'last_check': datetime.now().isoformat(),
-                    'note': 'Model loaded but details not found'
+                    'note': f"Model '{self.ollama.model}' not found in Ollama. Try 'ollama pull {self.ollama.model}'"
                 }
                 
-        except Exception as e:
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error reaching Ollama: {e}")
             return {
                 'is_available': False,
-                'error': str(e),
+                'error': f"Cannot connect to Ollama at http://{ollama_host}:{ollama_port}. Is Ollama running?",
                 'last_check': datetime.now().isoformat(),
-                'model': self.ollama.model
+                'model': self.ollama.model if hasattr(self, 'ollama') and hasattr(self.ollama, 'model') else 'unknown'
+            }
+        except requests.exceptions.Timeout as e:
+            logger.error(f"Timeout reaching Ollama: {e}")
+            return {
+                'is_available': False,
+                'error': f"Timeout connecting to Ollama. Service may be overloaded.",
+                'last_check': datetime.now().isoformat(),
+                'model': self.ollama.model if hasattr(self, 'ollama') and hasattr(self.ollama, 'model') else 'unknown'
+            }
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error reaching Ollama: {e}")
+            return {
+                'is_available': False,
+                'error': f"Error connecting to Ollama: {str(e)}",
+                'last_check': datetime.now().isoformat(),
+                'model': self.ollama.model if hasattr(self, 'ollama') and hasattr(self.ollama, 'model') else 'unknown'
+            }
+        except Exception as e:
+            logger.error(f"Unexpected error checking Ollama status: {e}")
+            return {
+                'is_available': False,
+                'error': f"Unexpected error: {str(e)}",
+                'last_check': datetime.now().isoformat(),
+                'model': self.ollama.model if hasattr(self, 'ollama') and hasattr(self.ollama, 'model') else 'unknown'
             }
 
     def get_break_suggestion(self, activity_stats: dict) -> dict:
@@ -433,6 +484,13 @@ class WellnessSuggestions:
                     context['next_meeting_in_minutes'] = int(time_diff)
                 except Exception as e:
                     logger.error(f"Error calculating next meeting time: {e}")
+        
+        # Add feedback about the last break suggestion if available
+        recent_feedback = self.user_prefs.get_recent_break_feedback(1)
+        if recent_feedback:
+            last_feedback = recent_feedback[0]
+            context['last_break_accepted'] = last_feedback.accepted
+            logger.info(f"Including feedback from last break: accepted={last_feedback.accepted}")
         
         try:
             # Use the new MCP-style message format

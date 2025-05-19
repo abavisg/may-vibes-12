@@ -38,6 +38,25 @@
                     </div>
                 </div>
                 
+                <!-- Agent Cycle Countdown -->
+                <div id="agentCountdown" style="display: flex; align-items: center; margin-top: 10px; background-color: #f8f9fa; padding: 10px; border-radius: 8px; border-left: 4px solid #4a90e2;">
+                    <div style="display: flex; flex-direction: column; flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i class="fas fa-sync-alt" style="color: #4a90e2; font-size: 20px;"></i>
+                            <span style="font-weight: 600; color: #333; font-size: 16px;">Next Agent Cycle:</span>
+                            <span id="countdownTimer" style="font-weight: 700; color: #4a90e2; font-size: 18px;">00:00</span>
+                            <span id="intervalDisplay" style="font-size: 14px; color: #6c757d; margin-left: 8px;">(interval: loading...)</span>
+                        </div>
+                        <div class="progress-container" style="margin-top: 8px; height: 6px; background-color: #e9ecef; border-radius: 3px; overflow: hidden; width: 100%;">
+                            <div id="countdownProgress" class="progress-bar" style="height: 100%; background-color: #4a90e2; width: 0%;"></div>
+                        </div>
+                    </div>
+                    <div style="margin-left: 15px; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 14px; color: #6c757d;">Completed cycles:</span>
+                        <span id="completedCycles" style="font-weight: 700; color: #333;">0</span>
+                    </div>
+                </div>
+                
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                     <div style="display: flex; gap: 10px;">
                         <button id="takeBreak" style="padding: 8px 16px; background-color: #4a90e2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">

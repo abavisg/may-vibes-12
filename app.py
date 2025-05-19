@@ -14,6 +14,9 @@ from config import Config
 import logging
 import random
 import time
+import threading
+from scheduler_agent import SchedulerAgent
+import context_manager as cm  # Import context manager to listen for scheduler updates
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +44,10 @@ calendar_service = CalendarService(use_google_calendar=Config.USE_CALENDAR_INTEG
                                   mock_time=mock_time if mock_mode_enabled else None)
 wellness_suggestions = WellnessSuggestions()
 wellness_score = WellnessScore()
+
+# Initialize the agent scheduler
+agent_scheduler = SchedulerAgent()
+agent_thread = None
 
 # Global variables for tracking state
 last_break_time = mock_time
@@ -139,6 +146,30 @@ def emit_dashboard_update():
         'data': dashboard_data
     })
 
+def get_scheduler_info():
+    """Get information about the next agent cycle"""
+    if not agent_scheduler:
+        return {
+            "next_run_at": None,
+            "time_remaining": {"minutes": 0, "seconds": 0},
+            "runs_completed": 0,
+            "last_run": None
+        }
+    
+    # Get time until next run
+    time_remaining = agent_scheduler.get_time_until_next_run()
+    
+    # Get other scheduler info from context
+    scheduler_state = cm.get_context("scheduler_agent.state") or {}
+    
+    return {
+        "next_run_at": scheduler_state.get("next_run_at"),
+        "time_remaining": time_remaining,
+        "runs_completed": scheduler_state.get("runs_completed", 0),
+        "last_run": scheduler_state.get("last_run"),
+        "frequency_seconds": Config.SCHEDULER_FREQUENCY
+    }
+
 def get_dashboard_data():
     """Get all data for the dashboard display"""
     current_time = calendar_service.get_current_time()
@@ -155,6 +186,9 @@ def get_dashboard_data():
     wellness_breakdown = wellness_score.get_score_breakdown()
     
     system_info = get_system_info()
+    
+    # Get scheduler information
+    scheduler_info = get_scheduler_info()
     
     return {
         'system_info': system_info,
@@ -179,7 +213,8 @@ def get_dashboard_data():
         'meeting_stats': {
             'attended': meetings_attended,
             'total': total_meetings
-        }
+        },
+        'scheduler_info': scheduler_info
     }
 
 @app.route('/')
@@ -265,23 +300,58 @@ def handle_disconnect():
     logger.info("Client disconnected")
 
 def start_monitoring():
-    """Initialize and start the monitoring systems"""
-    activity_tracker.start()
+    """Start all monitoring and scheduling processes"""
+    # Start our existing tasks
     
-    # Add jobs with proper error handling
     def add_job_safely(func, trigger, **trigger_args):
-        try:
-            scheduler.add_job(func, trigger, **trigger_args)
-        except Exception as e:
-            logger.error(f"Failed to add job {func.__name__}: {e}")
+        """Safely add a job to the scheduler, avoiding duplicate jobs"""
+        job_id = func.__name__
+        if scheduler.get_job(job_id):
+            scheduler.remove_job(job_id)
+        scheduler.add_job(func, trigger, id=job_id, **trigger_args)
+
+    # Convert scheduler frequency from seconds to minutes for check_work_patterns
+    check_interval_minutes = Config.SCHEDULER_FREQUENCY / 60
+    add_job_safely(check_work_patterns, 'interval', minutes=check_interval_minutes)
+    add_job_safely(update_wellness_metrics, 'interval', minutes=1)
     
-    add_job_safely(check_work_patterns, 'interval', minutes=5)
-    add_job_safely(update_wellness_metrics, 'interval', minutes=15)
+    # Start the agent scheduler in a separate thread
+    global agent_thread
+    if agent_thread is None or not agent_thread.is_alive():
+        agent_thread = threading.Thread(target=agent_scheduler.start)
+        agent_thread.daemon = True
+        agent_thread.start()
+        logger.info("Agent scheduler started")
+        
+        # Set up a background task to check for scheduler updates
+        def check_scheduler_updates():
+            last_runs_completed = 0
+            while True:
+                try:
+                    # Get current runs completed count
+                    scheduler_state = cm.get_context("scheduler_agent.state") or {}
+                    current_runs = scheduler_state.get("runs_completed", 0)
+                    
+                    # If it increased, notify clients
+                    if current_runs > last_runs_completed:
+                        logger.info(f"Detected scheduler cycle completion (runs: {current_runs})")
+                        emit_dashboard_update()
+                        last_runs_completed = current_runs
+                except Exception as e:
+                    logger.error(f"Error checking scheduler updates: {e}")
+                
+                # Check every second
+                time.sleep(1)
+        
+        # Start the checker in a separate thread
+        checker_thread = threading.Thread(target=check_scheduler_updates)
+        checker_thread.daemon = True
+        checker_thread.start()
     
-    try:
+    # Start the APScheduler (Flask app scheduler)
+    if not scheduler.running:
         scheduler.start()
-    except Exception as e:
-        logger.error(f"Failed to start scheduler: {e}")
+        logger.info("APScheduler started")
 
 def get_system_info():
     """Get system information for the dashboard"""

@@ -1,34 +1,81 @@
 import requests
 import json
 import logging
-from typing import Dict, List, Optional
+import socket
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class OllamaClient:
-    def __init__(self, base_url: str = "http://localhost:11434"):
-        """Initialize Ollama client with base URL"""
-        self.base_url = base_url
-        self.model = "tinyllama:latest"  # Using TinyLlama for faster prototyping
+    def __init__(self, host: str = "localhost", port: int = 11434, model: str = "tinyllama:latest"):
+        """Initialize Ollama client with host, port and model"""
+        self.host = host
+        self.port = port
+        self.base_url = f"http://{host}:{port}"
+        self.model = model  # Using TinyLlama for faster prototyping
         self.model_name = self.model.split(':')[0]  # Extract base model name
         self.model_size = '1B'  # Default size for TinyLlama
         self.last_suggestion = None  # Store the last suggestion for continuity
         
+        # Log initialization
+        logger.info(f"Initializing OllamaClient with host={host}, port={port}, model={model}")
+        
+        # Check availability at startup
+        available, status = self.check_availability_with_status()
+        if available:
+            logger.info(f"Successfully connected to Ollama. Model {model} is available.")
+        else:
+            logger.warning(f"Could not connect to Ollama: {status}")
+        
     def check_availability(self) -> bool:
         """Check if Ollama is available and the model is loaded"""
+        available, _ = self.check_availability_with_status()
+        return available
+        
+    def check_availability_with_status(self) -> Tuple[bool, str]:
+        """Check if Ollama is available and the model is loaded, returns status reason"""
         try:
+            # First check if the port is open
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(1)
+            result = sock.connect_ex((self.host, self.port))
+            sock.close()
+            
+            if result != 0:
+                return False, f"Port {self.port} is not open on {self.host}. Is Ollama running?"
+                
+            # Then check the API
             response = requests.get(f"{self.base_url}/api/tags", timeout=2)
-            response.raise_for_status()
+            
+            if response.status_code != 200:
+                return False, f"Ollama API returned status code {response.status_code}"
             
             # Check if our model is in the list of models
             models_data = response.json().get('models', [])
+            if not models_data:
+                return False, "No models found in Ollama"
+                
             model_info = next((m for m in models_data if m.get('name') == self.model), None)
             
-            return model_info is not None
+            if model_info is None:
+                available_models = ", ".join([m.get('name', 'unknown') for m in models_data])
+                return False, f"Model {self.model} not found. Available models: {available_models}"
+            
+            # Extract model size if available
+            if 'details' in model_info and 'parameter_size' in model_info['details']:
+                self.model_size = model_info['details']['parameter_size']
+                
+            return True, f"Model {self.model} is available"
+            
+        except requests.exceptions.ConnectionError as e:
+            return False, f"Connection error: {str(e)}"
+        except requests.exceptions.Timeout as e:
+            return False, f"Connection timeout: {str(e)}"
+        except requests.exceptions.RequestException as e:
+            return False, f"Request error: {str(e)}"
         except Exception as e:
-            logger.error(f"Error checking Ollama availability: {e}")
-            return False
+            return False, f"Unexpected error: {str(e)}"
     
     def get_suggestion(self, context: Dict) -> Dict:
         """
@@ -43,41 +90,71 @@ class OllamaClient:
                 - focus_data: Dict (optional)
                 - calendar_data: Dict (optional)
                 - next_meeting_in_minutes: int (optional)
+                - last_break_accepted: bool (optional)
         
         Returns:
             Dict containing the suggested break
         """
-        # Create a concise context description for the user prompt
-        user_content = self._create_context_description(context)
+        # Check if Ollama is available first
+        if not self.check_availability():
+            logger.warning("Ollama not available, using fallback suggestion")
+            fallback = self._get_fallback_suggestion(context)
+            return fallback
         
-        # Create messages array with system, user, and assistant roles
+        # Extract key information from context
+        time_of_day = context.get('time_of_day', 'afternoon')
+        active_duration = context.get('active_duration', 45)
+        activity_level = context.get('activity_level', 0.5)
+        
+        # Format meeting information
+        meeting_info = "No upcoming meetings"
+        if 'next_meeting_in_minutes' in context:
+            next_meeting = context['next_meeting_in_minutes']
+            if next_meeting > 0:
+                meeting_info = f"Meeting in {next_meeting} minutes"
+        
+        # Format focus information
+        focus_info = ""
+        if 'focus_data' in context:
+            focus_level = context['focus_data'].get('focus_level', 'unknown')
+            focus_mode = context['focus_data'].get('focus_mode', 'normal')
+            focus_info = f" Focus level: {focus_level} ({focus_mode})"
+        
+        # Create messages with improved human-readable format
         messages = [
             {
                 "role": "system", 
-                "content": "You are a wellness assistant that gives kind, timely micro-suggestions."
+                "content": "You are a kind wellness coach who gives personalised break suggestions to help the user maintain work-life balance."
             },
             {
                 "role": "user", 
-                "content": user_content
+                "content": f"The user has been working for {active_duration} minutes. It's currently {time_of_day}. Their activity level is {activity_level:.1f}/1.0.{focus_info} Upcoming meeting: {meeting_info}. Please suggest a suitable micro-break in JSON format with title, activity, duration, benefits, and type fields."
             }
         ]
         
-        # Add previous assistant message if we have one
+        # Add previous suggestion with user feedback if available
         if self.last_suggestion:
+            last_accepted = context.get('last_break_accepted', None)
+            feedback = ""
+            if last_accepted is not None:
+                feedback = f" and the user {'accepted' if last_accepted else 'ignored'} it."
+            
             messages.append({
                 "role": "assistant",
-                "content": json.dumps(self.last_suggestion)
+                "content": f"The last suggestion was: '{json.dumps(self.last_suggestion)}'{feedback}"
             })
         
         try:
             # Using Ollama's chat completions API with messages array
+            logger.info(f"Sending request to Ollama for break suggestion")
             response = requests.post(
                 f"{self.base_url}/api/chat",
                 json={
                     "model": self.model,
                     "messages": messages,
                     "stream": False
-                }
+                },
+                timeout=10  # Add timeout to avoid hanging
             )
             response.raise_for_status()
             
@@ -86,6 +163,7 @@ class OllamaClient:
             
             # Store this suggestion for future context
             self.last_suggestion = suggestion
+            logger.info(f"Successfully generated break suggestion: {suggestion['type']}")
             
             return suggestion
             
