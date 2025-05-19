@@ -22,6 +22,7 @@ class CalendarService:
         self.local_calendar_file = Config.get_local_calendar_path()
         self.calendar_id = Config.GOOGLE_CALENDAR_ID
         self.user_email = None
+        self.timezone = Config.get_timezone()
         
         if self.use_google_calendar and Config.is_google_calendar_configured():
             self._setup_google_calendar()
@@ -74,7 +75,7 @@ class CalendarService:
     def get_day_events(self, target_date: Optional[datetime] = None) -> List[Dict]:
         """Get all events for a specific day."""
         if not target_date:
-            target_date = datetime.now(pytz.timezone(Config.TIMEZONE))
+            target_date = datetime.now(self.timezone)
             
         start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
@@ -89,20 +90,33 @@ class CalendarService:
             return []
             
         try:
+            # Convert to UTC for Google Calendar API
+            start_time_utc = start_time.astimezone(pytz.UTC)
+            end_time_utc = end_time.astimezone(pytz.UTC)
+            
             events_result = self.google_calendar_service.events().list(
                 calendarId=self.calendar_id,
-                timeMin=start_time.isoformat() + 'Z',
-                timeMax=end_time.isoformat() + 'Z',
+                timeMin=start_time_utc.isoformat(),
+                timeMax=end_time_utc.isoformat(),
                 singleEvents=True,
                 orderBy='startTime'
             ).execute()
             
             events = events_result.get('items', [])
-            return [
-                {
+            formatted_events = []
+            
+            for event in events:
+                start = event['start'].get('dateTime', event['start'].get('date'))
+                end = event['end'].get('dateTime', event['end'].get('date'))
+                
+                # Convert to datetime objects in local timezone
+                start_dt = datetime.fromisoformat(start.replace('Z', '+00:00')).astimezone(self.timezone)
+                end_dt = datetime.fromisoformat(end.replace('Z', '+00:00')).astimezone(self.timezone)
+                
+                formatted_events.append({
                     'summary': event.get('summary', 'Untitled Event'),
-                    'start_time': event['start'].get('dateTime', event['start'].get('date')),
-                    'end_time': event['end'].get('dateTime', event['end'].get('date')),
+                    'start': start_dt.isoformat(),
+                    'end': end_dt.isoformat(),
                     'id': event['id'],
                     'description': event.get('description', ''),
                     'location': event.get('location', ''),
@@ -113,9 +127,9 @@ class CalendarService:
                     ],
                     'organizer': event.get('organizer', {}).get('email'),
                     'status': event.get('status', 'confirmed')
-                }
-                for event in events
-            ]
+                })
+            
+            return formatted_events
             
         except HttpError as error:
             print(f"Error fetching Google Calendar events: {str(error)}")
@@ -134,7 +148,7 @@ class CalendarService:
             upcoming_events = []
             
             for event in events:
-                event_start = datetime.fromisoformat(event['start_time'])
+                event_start = datetime.fromisoformat(event['start_time']).astimezone(self.timezone)
                 if start_time <= event_start < end_time:
                     upcoming_events.append(event)
             
@@ -146,12 +160,17 @@ class CalendarService:
     
     def get_upcoming_events(self, minutes_ahead: int = 30) -> List[Dict]:
         """Get upcoming calendar events within the specified time window."""
-        now = datetime.now(pytz.timezone(Config.TIMEZONE))
+        now = datetime.now(self.timezone)
         end_time = now + timedelta(minutes=minutes_ahead)
         
         if self.use_google_calendar:
             return self._get_google_calendar_events_for_range(now, end_time)
         return self._get_local_calendar_events_for_range(now, end_time)
+    
+    def get_next_event(self) -> Optional[Dict]:
+        """Get the next calendar event."""
+        events = self.get_upcoming_events(minutes_ahead=240)  # Look ahead 4 hours
+        return events[0] if events else None
     
     def is_free_for_next(self, minutes: int) -> bool:
         """Check if there are any events in the next X minutes."""
@@ -162,12 +181,12 @@ class CalendarService:
         """Find the next free time slot with at least min_duration minutes."""
         events = self.get_upcoming_events(240)  # Look ahead 4 hours
         if not events:
-            return datetime.now(pytz.timezone(Config.TIMEZONE))
+            return datetime.now(self.timezone)
             
-        now = datetime.now(pytz.timezone(Config.TIMEZONE))
+        now = datetime.now(self.timezone)
         for i in range(len(events)):
-            current_event_end = datetime.fromisoformat(events[i]['end_time'])
-            next_event_start = (datetime.fromisoformat(events[i + 1]['start_time']) 
+            current_event_end = datetime.fromisoformat(events[i]['end']).astimezone(self.timezone)
+            next_event_start = (datetime.fromisoformat(events[i + 1]['start']).astimezone(self.timezone) 
                               if i + 1 < len(events) else None)
             
             if next_event_start is None:
@@ -186,8 +205,8 @@ class CalendarService:
         
         busy_times = []
         for event in events:
-            start = datetime.fromisoformat(event['start_time'])
-            end = datetime.fromisoformat(event['end_time'])
+            start = datetime.fromisoformat(event['start']).astimezone(self.timezone)
+            end = datetime.fromisoformat(event['end']).astimezone(self.timezone)
             busy_times.append((start, end))
             
         return sorted(busy_times, key=lambda x: x[0]) 

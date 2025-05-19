@@ -7,7 +7,9 @@ A context-aware wellness companion that helps maintain a healthy work/life balan
 - **Smart Notifications** – Provides contextual wellness nudges based on work patterns
 - **Calendar Integration** – Considers your schedule when suggesting breaks
 - **Local Privacy** – Runs completely locally with no data transmission
-- **Customizable Routines** – Adapts to your preferred work hours and break patterns
+- **Adaptive Learning** – Learns from your break preferences and effectiveness ratings
+- **Activity-Aware** – Suggests breaks based on system usage patterns and work intensity
+- **Personalized Duration** – Adjusts break durations based on your feedback
 - **Modern Web Interface** – Clean, responsive design for easy interaction
 
 ## Tech Stack
@@ -16,6 +18,7 @@ A context-aware wellness companion that helps maintain a healthy work/life balan
 - Flask (Web Server)
 - APScheduler (Task Scheduling)
 - Google Calendar API (Optional)
+- NumPy (Statistical Analysis)
 - Modern Web Frontend (HTML5, CSS3, JavaScript)
 
 ## Setup
@@ -47,7 +50,6 @@ pip install -r requirements.txt
      # Application Settings
      TIMEZONE=Europe/London
      WORK_SESSION_THRESHOLD=45  # minutes
-     BREAK_DURATION=5  # minutes
      NOTIFICATION_INTERVAL=30  # seconds
 
      # Google Calendar Settings
@@ -61,21 +63,32 @@ pip install -r requirements.txt
      SECRET_KEY=your-secret-key-here  # Change this in production!
      ```
 
-## Calendar Integration
+## User Preferences & Learning
 
-The application supports two types of calendar integration:
+The application includes an adaptive learning system that:
 
-1. **Google Calendar**
-   - Real-time sync with your Google Calendar
-   - Automatic OAuth2 authentication
-   - Timezone-aware event handling
-   - Refresh token management
+1. **Break Type Selection**
+   - Learns which break types are most effective for you
+   - Adjusts suggestions based on time of day
+   - Considers your activity level and work patterns
 
-2. **Local Calendar**
-   - JSON-based local calendar support
-   - No external dependencies
-   - Example format provided in `local_calendar.json.example`
-   - Perfect for offline use or privacy concerns
+2. **Duration Optimization**
+   - Personalizes break durations based on your feedback
+   - Adapts to your schedule and work intensity
+   - Maintains optimal work/break balance
+
+3. **Effectiveness Tracking**
+   - Collects feedback on break effectiveness
+   - Monitors energy levels after breaks
+   - Uses data to improve future suggestions
+
+4. **Activity Context**
+   - Monitors system usage patterns
+   - Suggests appropriate breaks based on:
+     - CPU usage
+     - Memory utilization
+     - Idle time
+     - Work intensity
 
 ## Project Structure
 
@@ -84,6 +97,9 @@ The application supports two types of calendar integration:
 ├── app.py                  # Main Flask application
 ├── calendar_integration.py # Calendar service integration
 ├── config.py              # Configuration management
+├── wellness_suggestions.py # Break suggestion engine
+├── user_preferences.py    # User preference learning
+├── activity_tracker.py    # System activity monitoring
 ├── requirements.txt       # Python dependencies
 ├── static/               # Static web assets
 │   ├── css/
@@ -95,6 +111,9 @@ The application supports two types of calendar integration:
 │       └── icon.png     # Raster application icon
 ├── templates/            # HTML templates
 │   └── index.html       # Main application interface
+├── data/                # User data storage
+│   ├── preferences.json # User preferences
+│   └── break_history.json # Break history and feedback
 └── secrets/             # Secure credentials storage
     ├── credentials.json # Google OAuth credentials
     └── token.json      # OAuth refresh token
@@ -114,7 +133,8 @@ python app.py
      - Current work session duration
      - Time since last break
      - Upcoming calendar events
-     - Break controls
+     - Break suggestions and controls
+     - Activity level indicators
 
 ## Development
 
@@ -123,6 +143,9 @@ The application is built with modularity in mind:
 - `app.py` - Main Flask application and route handlers
 - `calendar_integration.py` - Handles calendar operations (Google/Local)
 - `config.py` - Centralizes configuration management
+- `wellness_suggestions.py` - Break suggestion engine with machine learning
+- `user_preferences.py` - User preference management and learning
+- `activity_tracker.py` - System activity monitoring
 - Web interface in `templates/` and `static/`
 
 ## Security Considerations
@@ -135,7 +158,8 @@ The application is built with modularity in mind:
 2. Local Data
    - All data stored locally
    - No external data transmission
-   - Configurable through environment variables
+   - User preferences stored securely
+   - Break history anonymized
 
 ## Contributing
 

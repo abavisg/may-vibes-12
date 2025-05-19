@@ -8,4 +8,5 @@ Werkzeug==3.0.1
 pytz==2024.1
 psutil==5.9.8
 Flask-Session==0.6.0
-Flask-Login==0.6.3 
+Flask-Login==0.6.3
+numpy==1.26.4 

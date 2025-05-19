@@ -88,12 +88,18 @@ async function updateCalendar() {
         
         if (data.events && data.events.length > 0) {
             data.events.forEach(event => {
+                const startTime = new Date(event.start);
+                const endTime = new Date(event.end);
+                
                 const eventElement = document.createElement('div');
                 eventElement.className = 'event-item';
                 eventElement.innerHTML = `
                     <div class="event-details">
                         <div class="event-title">${event.summary}</div>
-                        <div class="event-time">${new Date(event.start).toLocaleTimeString()}</div>
+                        <div class="event-time">
+                            ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}
+                        </div>
+                        ${event.location ? `<div class="event-location">${event.location}</div>` : ''}
                     </div>
                 `;
                 eventsList.appendChild(eventElement);
