@@ -12,6 +12,7 @@ A smart application that helps you maintain a healthy work-life balance by track
 - Calendar integration with timezone support
 - Wellness score tracking with personalized advice
 - Modern web interface with real-time updates
+- Shared context management system for agent communication
 
 ## Requirements
 
@@ -103,6 +104,14 @@ A smart application that helps you maintain a healthy work-life balance by track
 - Meeting status tracking
 - Break scheduling around meetings
 
+### Context Management System
+- Centralized shared context for all agents
+- Thread-safe access to shared state
+- Hierarchical data storage with dot-notation paths
+- Subscription system for context changes
+- Automatic context persistence and backup
+- Support for multiple agents working collaboratively
+
 ## Project Structure
 
 ```
@@ -115,6 +124,8 @@ A smart application that helps you maintain a healthy work-life balance by track
 ├── user_preferences.py    # User preference learning
 ├── activity_tracker.py    # Focus monitoring agent
 ├── wellness_score.py      # Wellness metrics calculation
+├── context_manager.py     # Shared context management
+├── agent_example.py       # Example of agent interaction
 ├── requirements.txt       # Python dependencies
 ├── static/               # Static web assets
 │   ├── css/
@@ -140,6 +151,7 @@ The application is built with modularity in mind:
 - `user_preferences.py` - User preference management and learning
 - `activity_tracker.py` - Agent-based focus monitoring (perception, reasoning, action)
 - `wellness_score.py` - Wellness metrics calculation
+- `context_manager.py` - Shared context management for agent communication
 - Web interface in `templates/` and `static/`
 
 ## Security Considerations
@@ -154,6 +166,7 @@ The application is built with modularity in mind:
    - No external data transmission
    - User preferences stored securely
    - Break history anonymized
+   - Context data persisted with automatic backups
 
 ## Agent-Based Architecture
 
@@ -165,6 +178,13 @@ The application leverages an agent-oriented architecture for its core monitoring
   - *Action*: Provides adaptable responses to changing conditions
   - Maintains internal knowledge base of activity patterns by time of day
   - Offers rich classification of focus modes based on activity patterns
+
+- **Context Management**:
+  - Enables seamless communication between agents
+  - Maintains a shared state accessible to all components
+  - Provides hierarchical data structure with path-based access
+  - Notifies agents of relevant changes through subscription system
+  - Persists the context state for continuity between sessions
 
 This approach enables more sophisticated pattern recognition, reasoning about user behavior, and proactive interventions.
 
