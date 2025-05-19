@@ -376,6 +376,10 @@ class WellnessSuggestions:
         
         Args:
             activity_stats: Dictionary containing activity statistics
+            
+        Note:
+            If activity_stats contains focus_level and focus_mode from the FocusMonitorAgent,
+            those will be used to provide more personalized suggestions.
         """
         self.last_break_check = datetime.now()
         current_time = self.user_prefs.get_current_time()
@@ -386,6 +390,10 @@ class WellnessSuggestions:
         # Determine time and activity categories
         time_category = self.get_time_category(current_time)
         activity_category = self.get_activity_category(activity_level)
+        
+        # Use focus information from the agent if available
+        focus_level = activity_stats.get('focus_level', None)
+        focus_mode = activity_stats.get('focus_mode', None)
         
         # Calculate work duration in minutes
         active_duration_minutes = int(activity_stats.get('active_duration', 0) / 60)
@@ -435,6 +443,11 @@ class WellnessSuggestions:
                 'system_stats': {
                     'cpu_percent': activity_stats['cpu_percent'],
                     'memory_percent': activity_stats['memory_percent']
+                },
+                'focus_data': {
+                    'focus_level': focus_level,
+                    'focus_mode': focus_mode,
+                    'active_apps': activity_stats.get('active_processes', [])
                 },
                 'selected_break_type': selected_break_type,
                 'break_title': break_info['title'],
@@ -505,6 +518,9 @@ class WellnessSuggestions:
         """
         Check work patterns and suggest breaks if needed.
         Returns a tuple of (should_take_break, suggestion, reason)
+        
+        If the activity_history contains focus information from FocusMonitorAgent,
+        it will be used to make more intelligent break decisions.
         """
         # Record the current check time
         self.last_check_time = datetime.now(timezone.utc).isoformat()
@@ -514,13 +530,39 @@ class WellnessSuggestions:
         logger.info(f"Checking work patterns at {current_time}")
         logger.info(f"Active time: {active_time_minutes} minutes, Idle time: {idle_time_minutes} minutes")
         
-        # Don't suggest breaks if the user has been idle for more than 10 minutes
+        # Get focus information if available
+        focus_level = activity_history.get('focus_level', None)
+        focus_mode = activity_history.get('focus_mode', None)
+        
+        # Make more intelligent break decisions if focus data is available
+        if focus_level and focus_mode:
+            logger.info(f"Focus level: {focus_level}, Focus mode: {focus_mode}")
+            
+            # Don't interrupt deep focus unless it's been going on too long
+            if focus_level == "deep-focus" and active_time_minutes < 60:
+                return False, None, "User in deep focus state"
+                
+            # Suggest breaks more aggressively for high cognitive load activities
+            if focus_mode in ["intense", "erratic-high"] and active_time_minutes > 30:
+                logger.info("User in high cognitive load activity. Break suggested.")
+                suggestion = self.get_break_suggestion(activity_history)
+                if suggestion:
+                    self.last_suggestion_time = datetime.now(timezone.utc).isoformat()
+                    return True, suggestion, "High cognitive load detected"
+        
+        # Standard idle checks
         if idle_time_minutes > 10:
             logger.info("User has been idle for more than 10 minutes. No break suggested.")
             return False, None, "User is already idle"
 
-        # Don't suggest breaks if active time is less than 45 minutes
-        if active_time_minutes < 45:
+        # Standard active time checks - adjust based on focus mode if available
+        minimum_active_time = 45  # default
+        if focus_mode in ["intense", "erratic-high"]:
+            minimum_active_time = 30  # suggest breaks sooner for high-intensity work
+        elif focus_mode in ["casual", "browsing", "low-activity"]:
+            minimum_active_time = 60  # suggest breaks later for low-intensity work
+            
+        if active_time_minutes < minimum_active_time:
             logger.info(f"User has only been active for {active_time_minutes} minutes. No break suggested.")
             return False, None, "Not enough active time"
 

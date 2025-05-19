@@ -65,8 +65,19 @@ def check_work_patterns():
                 # Check calendar for availability
                 next_meeting = calendar_service.get_next_event()
                 if not next_meeting or (next_meeting['start'] - current_time).total_seconds() > 900:
+                    # Get enhanced activity stats with focus information
                     activity_stats = activity_tracker.get_activity_stats()
-                    break_suggestion = wellness_suggestions.get_break_suggestion(activity_stats)
+                    
+                    # Get additional focus data from the agent
+                    agent_state = activity_tracker.act("update")
+                    
+                    # Combine standard stats with focus information from the agent
+                    enhanced_stats = {**activity_stats}
+                    enhanced_stats['focus_level'] = agent_state.get('focus_level', 'unknown')
+                    enhanced_stats['focus_mode'] = activity_tracker.get_focus_mode()
+                    enhanced_stats['active_processes'] = activity_tracker.perceptions.get('active_apps', [])[:3]
+                    
+                    break_suggestion = wellness_suggestions.get_break_suggestion(enhanced_stats)
                     breaks_suggested += 1
                     
                     # Emit break suggestion via WebSocket
@@ -89,6 +100,12 @@ def update_wellness_metrics():
         current_time = calendar_service.get_current_time()
         activity_stats = activity_tracker.get_activity_stats()
         
+        # Get enhanced focus data from the agent
+        agent_state = activity_tracker.act("update")
+        focus_level = agent_state.get('focus_level', 'unknown')
+        focus_mode = activity_tracker.get_focus_mode()
+        focus_history = activity_tracker.get_focus_history()
+        
         # Calculate active duration from idle duration
         active_minutes = max(0, (current_time - current_work_session_start).total_seconds() - activity_stats['idle_duration']) / 60
         rest_minutes = activity_stats['idle_duration'] / 60
@@ -102,7 +119,11 @@ def update_wellness_metrics():
             'meetings_attended': meetings_attended,
             'total_meetings': total_meetings,
             'cpu_percent': activity_stats['cpu_percent'],
-            'memory_percent': activity_stats['memory_percent']
+            'memory_percent': activity_stats['memory_percent'],
+            'focus_level': focus_level,
+            'focus_mode': focus_mode,
+            'focus_history': {hour: patterns[-1] if patterns else 'unknown' 
+                             for hour, patterns in focus_history.items()}
         }
         
         wellness_score.update_score(metrics)
@@ -125,6 +146,11 @@ def get_dashboard_data():
     # Get activity stats
     activity_stats = activity_tracker.get_activity_stats()
     
+    # Get focus information
+    agent_state = activity_tracker.act("update")
+    focus_level = agent_state.get('focus_level', 'unknown')
+    focus_mode = activity_tracker.get_focus_mode()
+    
     # Calculate wellness metrics
     wellness_breakdown = wellness_score.get_score_breakdown()
     
@@ -138,7 +164,10 @@ def get_dashboard_data():
             'memory_percent': activity_stats['memory_percent'],
             'is_active': activity_stats['is_active'],
             'idle_duration': activity_stats['idle_duration'],
-            'active_duration': (current_time - current_work_session_start).total_seconds()
+            'active_duration': (current_time - current_work_session_start).total_seconds(),
+            'focus_level': focus_level,
+            'focus_mode': focus_mode,
+            'active_applications': activity_tracker.perceptions.get('active_apps', [])[:3]
         },
         'break_stats': {
             'taken': breaks_taken,
@@ -276,11 +305,26 @@ def get_system_info():
     # Get activity stats for display
     activity_stats = activity_tracker.get_activity_stats()
     
-    # Get break recommendations
+    # Get enhanced focus information for break recommendations
+    agent_state = activity_tracker.act("update")
+    focus_level = agent_state.get('focus_level', 'unknown')
+    focus_mode = activity_tracker.get_focus_mode()
+    
+    # Enhance activity stats with focus data
+    enhanced_stats = {**activity_stats}
+    enhanced_stats['focus_level'] = focus_level
+    enhanced_stats['focus_mode'] = focus_mode
+    enhanced_stats['active_processes'] = activity_tracker.perceptions.get('active_apps', [])[:3]
+    
+    # Convert idle_duration from seconds to minutes for the wellness engine
+    active_duration_minutes = (current_time - current_work_session_start).total_seconds() / 60
+    idle_duration_minutes = activity_stats.get('idle_duration', 0) / 60
+    
+    # Get break recommendations with enhanced activity data
     break_rec = wellness_suggestions.check_work_patterns(
-        activity_stats.get('active_duration_minutes', 0),
-        activity_stats.get('idle_duration_minutes', 0),
-        activity_stats
+        active_duration_minutes,
+        idle_duration_minutes,
+        enhanced_stats
     )
     should_break, suggestion, reason = break_rec
     
@@ -288,13 +332,20 @@ def get_system_info():
     if should_break and suggestion:
         socketio.emit('break_suggestion', suggestion)
     
-    # Now using the properly implemented methods
+    # Get enhanced focus information from the agent
     focus_mode = activity_tracker.get_focus_mode()
+    
+    # Get agent state through perception-reasoning cycle
+    agent_perception = activity_tracker.perceive()
+    agent_reasoning = activity_tracker.reason()
+    focus_history = activity_tracker.get_focus_history()
     
     system_info = {
         'time': current_time.strftime('%Y-%m-%d %H:%M:%S'),
         'uptime': activity_tracker.get_uptime_seconds(),
         'focus_mode': focus_mode,
+        'focus_level': agent_reasoning.get('focus_level', 'unknown'),
+        'active_processes': activity_tracker.perceptions.get('active_apps', [])[:3],
         'activity_level': activity_stats.get('activity_level', 0),
         'active_duration': activity_stats.get('active_duration', 0),
         'idle_duration': activity_stats.get('idle_duration', 0),

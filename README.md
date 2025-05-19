@@ -1,11 +1,14 @@
 # Work/Life Balance Coach
 
-A smart application that helps you maintain a healthy work-life balance by tracking your work patterns, suggesting breaks, and providing personalized wellness advice.
+A smart application that helps you maintain a healthy work-life balance by tracking your work patterns, suggesting breaks, and providing personalized wellness advice using an agent-based architecture to monitor and understand your focus patterns.
 
 ## Features
 
-- Real-time activity tracking (CPU, memory, idle time)
-- AI-powered break suggestions using Ollama
+- Agent-based focus monitoring with perception-reasoning-action cycle
+- Focus level classification (deep-focus, focused, active, light, minimal)
+- Focus mode detection (intense, focused, casual, browsing, etc.)
+- Real-time activity tracking (CPU, memory, idle time, active applications)
+- AI-powered break suggestions using Ollama with focus awareness
 - Calendar integration with timezone support
 - Wellness score tracking with personalized advice
 - Modern web interface with real-time updates
@@ -102,7 +105,7 @@ A smart application that helps you maintain a healthy work-life balance by track
 ├── wellness_suggestions.py # Break suggestion engine
 ├── ollama_client.py       # AI integration with Ollama
 ├── user_preferences.py    # User preference learning
-├── activity_tracker.py    # System activity monitoring
+├── activity_tracker.py    # Focus monitoring agent
 ├── wellness_score.py      # Wellness metrics calculation
 ├── requirements.txt       # Python dependencies
 ├── static/               # Static web assets
@@ -127,7 +130,7 @@ The application is built with modularity in mind:
 - `wellness_suggestions.py` - Break suggestion engine
 - `ollama_client.py` - AI integration for personalized suggestions
 - `user_preferences.py` - User preference management and learning
-- `activity_tracker.py` - System activity monitoring
+- `activity_tracker.py` - Agent-based focus monitoring (perception, reasoning, action)
 - `wellness_score.py` - Wellness metrics calculation
 - Web interface in `templates/` and `static/`
 
@@ -143,6 +146,19 @@ The application is built with modularity in mind:
    - No external data transmission
    - User preferences stored securely
    - Break history anonymized
+
+## Agent-Based Architecture
+
+The application leverages an agent-oriented architecture for its core monitoring capabilities:
+
+- **FocusMonitorAgent**: Implements perception-reasoning-action cycle
+  - *Perception*: Monitors system metrics and user activity
+  - *Reasoning*: Analyzes patterns and determines focus states
+  - *Action*: Provides adaptable responses to changing conditions
+  - Maintains internal knowledge base of activity patterns by time of day
+  - Offers rich classification of focus modes based on activity patterns
+
+This approach enables more sophisticated pattern recognition, reasoning about user behavior, and proactive interventions.
 
 ## Calendar Integration
 
