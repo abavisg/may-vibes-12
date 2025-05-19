@@ -1,0 +1,11 @@
+.env
+.venv
+
+/secrets
+/logs
+/data
+/cache
+/temp
+/backup
+/docs
+/tests
