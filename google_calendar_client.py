@@ -17,58 +17,91 @@ class GoogleCalendarClient:
     def authenticate(self):
         """Handle Google Calendar authentication using OAuth 2.0."""
         creds = None
-        
-        # Check if token.json exists with valid credentials
         token_path = Config.get_token_path()
-        if token_path.exists():
-            creds = Credentials.from_authorized_user_file(str(token_path), self.SCOPES)
         
-        # If no valid credentials available, let user log in
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                client_secret_path = Config.get_client_secret_path()
-                if not client_secret_path.exists():
-                    raise FileNotFoundError(
-                        f'{Config.GOOGLE_CLIENT_SECRET_FILE} not found in {Config.SECRETS_DIR}. '
-                        'Please download it from Google Cloud Console.'
-                    )
-                
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    str(client_secret_path), 
-                    self.SCOPES,
-                    redirect_uri=Config.get_oauth_redirect_uri()
-                )
-                
-                # Print helpful message about the redirect URI
-                print(f"\nUsing redirect URI: {Config.get_oauth_redirect_uri()}")
-                print("Make sure this URI is configured in your Google Cloud Console OAuth 2.0 Client ID settings.")
-                
+        try:
+            # Check if token.json exists with valid credentials
+            if token_path.exists():
                 try:
-                    creds = flow.run_local_server(
-                        host=Config.GOOGLE_OAUTH_HOST,
-                        port=Config.GOOGLE_OAUTH_PORT
-                    )
+                    creds = Credentials.from_authorized_user_file(str(token_path), self.SCOPES)
                 except Exception as e:
-                    print(f"\nError during OAuth flow: {str(e)}")
-                    print("\nPlease ensure the following redirect URI is configured in Google Cloud Console:")
-                    print(f"    {Config.get_oauth_redirect_uri()}")
-                    print("\nSteps to fix this:")
-                    print("1. Go to Google Cloud Console > APIs & Services > Credentials")
-                    print("2. Find your OAuth 2.0 Client ID")
-                    print("3. Click Edit (pencil icon)")
-                    print("4. Add the above URI to 'Authorized redirect URIs'")
-                    print("5. Click Save and try again")
-                    raise
+                    print(f"\nError reading token file: {e}")
+                    print("Removing invalid token file and starting fresh...")
+                    token_path.unlink()  # Delete the invalid token file
+                    creds = None
             
-            # Save the credentials for future use
-            with open(token_path, 'w') as token:
-                token.write(creds.to_json())
-        
-        self.creds = creds
-        self.service = build('calendar', 'v3', credentials=creds)
-        return True
+            # If no valid credentials available, let user log in
+            if not creds or not creds.valid:
+                if creds and creds.expired and creds.refresh_token:
+                    try:
+                        creds.refresh(Request())
+                    except Exception as e:
+                        print(f"\nError refreshing token: {e}")
+                        print("Starting fresh OAuth flow...")
+                        creds = None
+                
+                if not creds:
+                    client_secret_path = Config.get_client_secret_path()
+                    if not client_secret_path.exists():
+                        raise FileNotFoundError(
+                            f'{Config.GOOGLE_CLIENT_SECRET_FILE} not found in {Config.SECRETS_DIR}. '
+                            'Please download it from Google Cloud Console.'
+                        )
+                    
+                    flow = InstalledAppFlow.from_client_secrets_file(
+                        str(client_secret_path), 
+                        self.SCOPES,
+                        redirect_uri=Config.get_oauth_redirect_uri()
+                    )
+                    
+                    # Print helpful message about the redirect URI
+                    print(f"\nUsing redirect URI: {Config.get_oauth_redirect_uri()}")
+                    print("Make sure this URI is configured in your Google Cloud Console OAuth 2.0 Client ID settings.")
+                    
+                    try:
+                        # Force consent to ensure we get a refresh token
+                        creds = flow.run_local_server(
+                            host=Config.GOOGLE_OAUTH_HOST,
+                            port=Config.GOOGLE_OAUTH_PORT,
+                            authorization_prompt_message="Please authorize the application again to ensure proper access.",
+                            prompt='consent'  # Force consent screen to appear
+                        )
+                    except Exception as e:
+                        print(f"\nError during OAuth flow: {str(e)}")
+                        print("\nPlease ensure the following redirect URI is configured in Google Cloud Console:")
+                        print(f"    {Config.get_oauth_redirect_uri()}")
+                        print("\nSteps to fix this:")
+                        print("1. Go to Google Cloud Console > APIs & Services > Credentials")
+                        print("2. Find your OAuth 2.0 Client ID")
+                        print("3. Click Edit (pencil icon)")
+                        print("4. Add the above URI to 'Authorized redirect URIs'")
+                        print("5. Click Save and try again")
+                        raise
+                
+                # Verify we have a refresh token before saving
+                if not creds.refresh_token:
+                    print("\nWarning: No refresh token received. Please try revoking access and authenticating again:")
+                    print("1. Go to https://myaccount.google.com/permissions")
+                    print("2. Find this application and click 'Remove Access'")
+                    print("3. Run this script again")
+                    raise Exception("No refresh token received during authentication")
+                
+                # Save the credentials for future use
+                with open(token_path, 'w') as token:
+                    token.write(creds.to_json())
+            
+            self.creds = creds
+            self.service = build('calendar', 'v3', credentials=creds)
+            return True
+            
+        except Exception as e:
+            error_msg = str(e)
+            if "Scope has changed" in error_msg:
+                print("\nDetected scope change. Removing old token and retrying authentication...")
+                if token_path.exists():
+                    token_path.unlink()  # Delete the token file
+                return self.authenticate()  # Retry authentication
+            raise
     
     def get_today_events(self):
         """Get all calendar events scheduled for today."""
