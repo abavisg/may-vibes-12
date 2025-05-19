@@ -1,6 +1,10 @@
 from datetime import datetime, time
 import random
 from user_preferences import UserPreferences, BreakFeedback
+from ollama_client import OllamaClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 class WellnessSuggestions:
     def __init__(self):
@@ -9,6 +13,7 @@ class WellnessSuggestions:
         self.lunch_end = time(14, 0)
         self.evening_start = time(17, 0)
         self.user_prefs = UserPreferences()
+        self.ollama = OllamaClient()
 
         # Different types of breaks with their suggestions
         self.break_types = {
@@ -66,37 +71,83 @@ class WellnessSuggestions:
                 memory_score * memory_weight + 
                 idle_score * idle_weight)
 
-    def get_break_suggestion(self, activity_stats: dict, last_break_type: str = None) -> dict:
-        """Get a context-aware break suggestion based on activity, time, and user preferences"""
-        current_time = datetime.now()
-        activity_level = self.calculate_activity_level(activity_stats)
+    def get_break_suggestion(self, activity_stats: dict) -> dict:
+        """
+        Get personalized break suggestion based on current context
         
-        # Get optimal break type based on current context and user preferences
-        break_type = self.user_prefs.get_optimal_break_type(current_time, activity_level)
+        Args:
+            activity_stats: Dictionary containing activity statistics
+        """
+        current_time = self.user_prefs.get_current_time()
+        hour = current_time.hour
         
-        # Get break duration from user preferences
-        duration = self.user_prefs.get_optimal_break_duration(break_type)
+        # Determine time of day
+        if 5 <= hour < 12:
+            time_of_day = "morning"
+        elif 12 <= hour < 17:
+            time_of_day = "afternoon"
+        else:
+            time_of_day = "evening"
         
-        # Build suggestion
-        break_info = {
-            'type': break_type,
-            'title': self.break_types[break_type]['title'],
-            'suggestion': random.choice(self.break_types[break_type]['suggestions']),
-            'duration': duration,
-            'activity_level': activity_level
+        # Calculate activity level (0-1)
+        activity_level = min(1.0, activity_stats['cpu_percent'] / 100)
+        
+        # Get recent break history
+        break_history = self.user_prefs.break_history[-5:]  # Last 5 breaks
+        
+        context = {
+            'time_of_day': time_of_day,
+            'active_duration': int(activity_stats.get('active_duration', 0) / 60),  # Convert to minutes
+            'break_history': [
+                {
+                    'type': b.break_type,
+                    'effectiveness': b.effectiveness_rating
+                }
+                for b in break_history
+                if b.effectiveness_rating is not None
+            ],
+            'activity_level': activity_level,
+            'wellness_score': 100,  # Default score, should be updated with actual score
+            'system_stats': {
+                'cpu_percent': activity_stats['cpu_percent'],
+                'memory_percent': activity_stats['memory_percent']
+            }
         }
         
-        return break_info
+        # Get suggestion from Ollama
+        suggestion = self.ollama.generate_break_suggestion(context)
+        
+        # Update break type weights based on suggestion
+        self._update_break_weights(suggestion['type'])
+        
+        return suggestion
+
+    def get_wellness_advice(self, metrics: dict) -> list:
+        """
+        Get personalized wellness advice based on current metrics
+        
+        Args:
+            metrics: Dictionary containing wellness metrics and scores
+        """
+        return self.ollama.generate_wellness_advice(metrics)
 
     def record_break_feedback(self, break_type: str, accepted: bool, completed: bool,
                             effectiveness_rating: int = None, energy_level_after: int = None):
         """Record user feedback about a break suggestion"""
         feedback = BreakFeedback(
             break_type=break_type,
-            timestamp=datetime.now(),
+            timestamp=self.user_prefs.get_current_time(),
             accepted=accepted,
             completed=completed,
             effectiveness_rating=effectiveness_rating,
             energy_level_after=energy_level_after
         )
-        self.user_prefs.add_break_feedback(feedback) 
+        self.user_prefs.add_break_feedback(feedback)
+
+    def _update_break_weights(self, suggested_type: str):
+        """Update break type weights based on suggestion"""
+        current_weight = self.user_prefs.preferences['break_type_weights'].get(suggested_type, 1.0)
+        # Slightly increase weight for suggested type
+        new_weight = min(2.0, current_weight * 1.1)
+        self.user_prefs.preferences['break_type_weights'][suggested_type] = new_weight
+        self.user_prefs.save() 

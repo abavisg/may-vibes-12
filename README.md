@@ -1,94 +1,90 @@
-# May AI Vibes – Work/Life Balance Coach
+# Work/Life Balance Coach
 
-A context-aware wellness companion that helps maintain a healthy work/life balance by monitoring your working activity and providing timely micro-interventions.
+A smart application that helps you maintain a healthy work-life balance by tracking your work patterns, suggesting breaks, and providing personalized wellness advice.
 
 ## Features
 
-- **Smart Notifications** – Provides contextual wellness nudges based on work patterns
-- **Calendar Integration** – Considers your schedule when suggesting breaks
-- **Local Privacy** – Runs completely locally with no data transmission
-- **Adaptive Learning** – Learns from your break preferences and effectiveness ratings
-- **Activity-Aware** – Suggests breaks based on system usage patterns and work intensity
-- **Personalized Duration** – Adjusts break durations based on your feedback
-- **Modern Web Interface** – Clean, responsive design for easy interaction
+- Real-time activity tracking (CPU, memory, idle time)
+- AI-powered break suggestions using Ollama
+- Calendar integration with timezone support
+- Wellness score tracking with personalized advice
+- Modern web interface with real-time updates
 
-## Tech Stack
+## Requirements
 
-- Python 3.9+
-- Flask (Web Server)
-- APScheduler (Task Scheduling)
-- Google Calendar API (Optional)
-- NumPy (Statistical Analysis)
-- Modern Web Frontend (HTML5, CSS3, JavaScript)
+- Python 3.8+
+- Ollama (for AI-powered suggestions)
+- Modern web browser
+- Google Calendar API credentials (optional)
 
-## Setup
+## Installation
 
-1. Create a Python virtual environment:
-```bash
-python -m venv venv
-source venv/bin/activate  # On Unix/macOS
-# or
-.\venv\Scripts\activate  # On Windows
-```
-
+1. Clone the repository
 2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Install and start Ollama:
+   ```bash
+   # Follow instructions at https://ollama.ai to install Ollama
+   ollama pull tinyllama:latest  # Pull the TinyLlama model (faster for prototyping)
+   ollama serve         # Start the Ollama server
+   ```
 
-3. Configure Google Calendar (Optional):
-   - Go to Google Cloud Console and create a project
-   - Enable the Google Calendar API
-   - Create OAuth 2.0 credentials
-   - Download the credentials and save as `secrets/credentials.json`
-   - Set up your OAuth consent screen
+## Configuration
 
-4. Configure the application:
-   - Copy `.env.example` to `.env`
-   - Update settings in `.env` with your preferences:
-     ```
-     # Application Settings
-     TIMEZONE=Europe/London
-     WORK_SESSION_THRESHOLD=45  # minutes
-     NOTIFICATION_INTERVAL=30  # seconds
+1. Copy `credentials.json.example` to `credentials.json` and add your Google Calendar API credentials (optional)
+2. Adjust settings in `config.py` as needed
+3. The application uses port 5002 by default
 
-     # Google Calendar Settings
-     GOOGLE_CALENDAR_ENABLED=true
-     GOOGLE_CALENDAR_CREDENTIALS_PATH=secrets/credentials.json
-     GOOGLE_CALENDAR_TOKEN_PATH=secrets/token.json
+## Usage
 
-     # Development Settings
-     FLASK_ENV=development
-     FLASK_DEBUG=1
-     SECRET_KEY=your-secret-key-here  # Change this in production!
-     ```
+1. Start the application:
+   ```bash
+   python app.py
+   ```
+2. Open your browser and navigate to `http://localhost:5002`
+3. Allow notifications when prompted for break reminders
 
-## User Preferences & Learning
+## Features in Detail
 
-The application includes an adaptive learning system that:
+### Activity Tracking
+- Monitors system resource usage
+- Tracks idle time and work patterns
+- Provides real-time activity statistics
 
-1. **Break Type Selection**
-   - Learns which break types are most effective for you
-   - Adjusts suggestions based on time of day
-   - Considers your activity level and work patterns
+### AI-Powered Break Management
+- Intelligent break suggestions using Ollama's TinyLlama model
+- Fast response times for quick prototyping
+- Context-aware recommendations based on:
+  - Time of day
+  - Work duration
+  - Activity levels
+  - System usage
+  - Calendar events
+- Break types include:
+  - Eye breaks
+  - Stretch breaks
+  - Walk breaks
+  - Hydration breaks
+- Fallback suggestions when AI is unavailable
+- Break effectiveness tracking
 
-2. **Duration Optimization**
-   - Personalizes break durations based on your feedback
-   - Adapts to your schedule and work intensity
-   - Maintains optimal work/break balance
+### Wellness Score
+- Overall wellness score calculation
+- Component-based scoring:
+  - Break compliance
+  - Work duration
+  - Activity balance
+  - Schedule adherence
+  - System usage
+- AI-generated improvement suggestions
 
-3. **Effectiveness Tracking**
-   - Collects feedback on break effectiveness
-   - Monitors energy levels after breaks
-   - Uses data to improve future suggestions
-
-4. **Activity Context**
-   - Monitors system usage patterns
-   - Suggests appropriate breaks based on:
-     - CPU usage
-     - Memory utilization
-     - Idle time
-     - Work intensity
+### Calendar Integration
+- Local or Google Calendar support
+- Timezone-aware scheduling
+- Meeting status tracking
+- Break scheduling around meetings
 
 ## Project Structure
 
@@ -98,8 +94,10 @@ The application includes an adaptive learning system that:
 ├── calendar_integration.py # Calendar service integration
 ├── config.py              # Configuration management
 ├── wellness_suggestions.py # Break suggestion engine
+├── ollama_client.py       # AI integration with Ollama
 ├── user_preferences.py    # User preference learning
 ├── activity_tracker.py    # System activity monitoring
+├── wellness_score.py      # Wellness metrics calculation
 ├── requirements.txt       # Python dependencies
 ├── static/               # Static web assets
 │   ├── css/
@@ -107,35 +105,11 @@ The application includes an adaptive learning system that:
 │   ├── js/
 │   │   └── app.js       # Frontend functionality
 │   └── img/
-│       ├── icon.svg     # Vector application icon
-│       └── icon.png     # Raster application icon
 ├── templates/            # HTML templates
 │   └── index.html       # Main application interface
 ├── mock-data/           # Mock data for development
-│   ├── preferences.json # Default user preferences
-│   ├── break_history.json # Sample break records
-│   └── local_calendar_current.json # Sample calendar data
 └── secrets/             # Secure credentials storage
-    ├── credentials.json # Google OAuth credentials
-    └── token.json      # OAuth refresh token
 ```
-
-## Running the Application
-
-1. Start the main service:
-```bash
-python app.py
-```
-
-2. Access the web interface:
-   - Open `http://localhost:5001` in your browser
-   - Allow notifications when prompted
-   - The interface will show:
-     - Current work session duration
-     - Time since last break
-     - Upcoming calendar events
-     - Break suggestions and controls
-     - Activity level indicators
 
 ## Development
 
@@ -144,9 +118,11 @@ The application is built with modularity in mind:
 - `app.py` - Main Flask application and route handlers
 - `calendar_integration.py` - Handles calendar operations (Google/Local)
 - `config.py` - Centralizes configuration management
-- `wellness_suggestions.py` - Break suggestion engine with machine learning
+- `wellness_suggestions.py` - Break suggestion engine
+- `ollama_client.py` - AI integration for personalized suggestions
 - `user_preferences.py` - User preference management and learning
 - `activity_tracker.py` - System activity monitoring
+- `wellness_score.py` - Wellness metrics calculation
 - Web interface in `templates/` and `static/`
 
 ## Security Considerations
@@ -162,23 +138,19 @@ The application is built with modularity in mind:
    - User preferences stored securely
    - Break history anonymized
 
+## Calendar Integration
+
+The application supports both local and Google Calendar integration:
+- Google Calendar integration requires OAuth2 credentials
+- Local calendar support for offline usage
+- All calendar operations are timezone-aware
+- Events are used to optimize break scheduling
+
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-MIT
-
-## Calendar Integration
-
-The application currently uses local calendar data for development and testing:
-- Sample calendar data is stored in `mock-data/local_calendar_current.json`
-- Calendar events are set in London timezone (Europe/London)
-- Events include typical workday schedule (9am-6pm)
-- Google Calendar integration is available but optional
+This project is licensed under the MIT License - see the LICENSE file for details.
 
