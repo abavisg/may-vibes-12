@@ -398,91 +398,105 @@ class WellnessSuggestions:
         # Calculate work duration in minutes
         active_duration_minutes = int(activity_stats.get('active_duration', 0) / 60)
         
-        # Get personalized break weights
-        break_weights = self.get_break_weights(
-            time_category, 
-            activity_category, 
-            active_duration_minutes
+        # Prepare context for LLM using MCP format
+        context = {
+            'time_of_day': time_category,
+            'active_duration': active_duration_minutes,
+            'activity_level': activity_level
+        }
+        
+        # Add focus data if available
+        if focus_level and focus_mode:
+            context['focus_data'] = {
+                'focus_level': focus_level,
+                'focus_mode': focus_mode,
+                'active_apps': activity_stats.get('active_processes', [])
+            }
+        
+        # Get upcoming meetings if available
+        upcoming_meetings = self.user_prefs.get_upcoming_meetings(
+            lookback_minutes=0, 
+            lookahead_minutes=60
         )
         
-        # Log the weights for debugging
-        logger.debug(f"Break weights: {break_weights}")
-        
-        # Select break type based on weights
-        selected_break_type = self.select_break_type(break_weights)
-        
-        # Get break details
-        break_info = self.break_types.get(selected_break_type)
-        if not break_info:
-            # Fallback if somehow we selected an invalid break type
-            selected_break_type = random.choice(list(self.break_types.keys()))
-            break_info = self.break_types[selected_break_type]
-        
-        # Select a random suggestion for this break type
-        suggestion_text = random.choice(break_info['suggestions'])
-        
-        # Get optimal duration based on user preferences
-        duration = self.user_prefs.get_optimal_break_duration(selected_break_type)
-        
-        # Try to generate a contextual suggestion with the LLM
-        try:
-            # Prepare context for LLM
-            context = {
-                'time_of_day': time_category,
-                'active_duration': active_duration_minutes,
-                'break_history': [
-                    {
-                        'type': b.break_type,
-                        'effectiveness': b.effectiveness_rating
-                    }
-                    for b in self.user_prefs.break_history[-5:]
-                    if b.effectiveness_rating is not None
-                ],
-                'activity_level': activity_level,
-                'wellness_score': 100,  # Default score
-                'system_stats': {
-                    'cpu_percent': activity_stats['cpu_percent'],
-                    'memory_percent': activity_stats['memory_percent']
-                },
-                'focus_data': {
-                    'focus_level': focus_level,
-                    'focus_mode': focus_mode,
-                    'active_apps': activity_stats.get('active_processes', [])
-                },
-                'selected_break_type': selected_break_type,
-                'break_title': break_info['title'],
-                'break_suggestion': suggestion_text,
-                'break_duration': duration
-            }
+        if upcoming_meetings:
+            next_meeting = upcoming_meetings[0]
+            next_meeting_time = next_meeting.get('start')
             
-            # Get suggestion from LLM
-            llm_suggestion = self.ollama.generate_break_suggestion(context)
+            if next_meeting_time:
+                # Calculate minutes until next meeting
+                try:
+                    if isinstance(next_meeting_time, str):
+                        next_meeting_time = datetime.fromisoformat(next_meeting_time)
+                    
+                    time_diff = (next_meeting_time - current_time).total_seconds() / 60
+                    context['next_meeting_in_minutes'] = int(time_diff)
+                except Exception as e:
+                    logger.error(f"Error calculating next meeting time: {e}")
+        
+        try:
+            # Use the new MCP-style message format
+            suggestion = self.ollama.get_suggestion(context)
             self.last_suggestion_time = datetime.now()
             
             # Update break type weights based on suggestion
-            self._update_break_weights(selected_break_type)
+            self._update_break_weights(suggestion.get('type', 'stretch_break'))
             
-            # Return the LLM suggestion
-            return llm_suggestion
+            return suggestion
             
         except Exception as e:
-            # Fallback to our pre-selected suggestion if LLM fails
-            logger.error(f"Error getting LLM suggestion: {e}")
-            self.last_suggestion_time = datetime.now()
-            
-            # Create fallback suggestion
-            fallback_suggestion = {
-                'title': break_info['title'],
-                'activity': suggestion_text,
-                'duration': duration,
-                'benefits': ["Reduces fatigue", "Improves focus"],
-                'type': selected_break_type
-            }
-            
-            # Update break type weights
-            self._update_break_weights(selected_break_type)
-            
-            return fallback_suggestion
+            # Fallback to previous method if the new one fails
+            logger.error(f"Error using MCP message format, falling back: {e}")
+            try:
+                # Get personalized break weights
+                break_weights = self.get_break_weights(
+                    time_category, 
+                    activity_category, 
+                    active_duration_minutes
+                )
+                
+                # Select break type based on weights
+                selected_break_type = self.select_break_type(break_weights)
+                
+                # Get break details
+                break_info = self.break_types.get(selected_break_type)
+                if not break_info:
+                    # Fallback if somehow we selected an invalid break type
+                    selected_break_type = random.choice(list(self.break_types.keys()))
+                    break_info = self.break_types[selected_break_type]
+                
+                # Select a random suggestion for this break type
+                suggestion_text = random.choice(break_info['suggestions'])
+                
+                # Get optimal duration based on user preferences
+                duration = self.user_prefs.get_optimal_break_duration(selected_break_type)
+                
+                # Create fallback suggestion
+                fallback_suggestion = {
+                    'title': break_info['title'],
+                    'activity': suggestion_text,
+                    'duration': duration,
+                    'benefits': ["Reduces fatigue", "Improves focus"],
+                    'type': selected_break_type
+                }
+                
+                # Update break type weights
+                self._update_break_weights(selected_break_type)
+                self.last_suggestion_time = datetime.now()
+                
+                return fallback_suggestion
+                
+            except Exception as nested_e:
+                logger.error(f"Both suggestion methods failed: {nested_e}")
+                # Ultimate fallback
+                self.last_suggestion_time = datetime.now()
+                return {
+                    'title': "Quick Break",
+                    'activity': "Stand up and stretch for a minute",
+                    'duration': 2,
+                    'benefits': ["Reduces fatigue", "Improves circulation"],
+                    'type': "stretch_break"
+                }
 
     def get_wellness_advice(self, metrics: dict) -> list:
         """

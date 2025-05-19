@@ -64,6 +64,8 @@ A smart application that helps you maintain a healthy work-life balance by track
 
 ### AI-Powered Break Management
 - Intelligent break suggestions using Ollama's TinyLlama model
+- Support for Model Context Protocol (MCP)-style messaging format
+- Conversational context for more natural and coherent suggestions
 - Fast response times for quick prototyping
 - Context-aware recommendations based on:
   - Time of day
@@ -71,11 +73,17 @@ A smart application that helps you maintain a healthy work-life balance by track
   - Activity levels
   - System usage
   - Calendar events
+  - Focus state and cognitive load
 - Break types include:
   - Eye breaks
   - Stretch breaks
   - Walk breaks
   - Hydration breaks
+  - Posture breaks
+  - Breathing exercises
+  - Mindfulness moments
+  - Nature connections
+  - Creative pauses
 - Fallback suggestions when AI is unavailable
 - Break effectiveness tracking
 

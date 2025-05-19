@@ -13,6 +13,7 @@ class OllamaClient:
         self.model = "tinyllama:latest"  # Using TinyLlama for faster prototyping
         self.model_name = self.model.split(':')[0]  # Extract base model name
         self.model_size = '1B'  # Default size for TinyLlama
+        self.last_suggestion = None  # Store the last suggestion for continuity
         
     def check_availability(self) -> bool:
         """Check if Ollama is available and the model is loaded"""
@@ -28,6 +29,94 @@ class OllamaClient:
         except Exception as e:
             logger.error(f"Error checking Ollama availability: {e}")
             return False
+    
+    def get_suggestion(self, context: Dict) -> Dict:
+        """
+        Generate personalized break suggestion using Model Context Protocol (MCP)-style messages
+        
+        Args:
+            context: Dictionary containing:
+                - time_of_day: str
+                - active_duration: int (minutes)
+                - break_history: List[Dict]
+                - activity_level: float
+                - focus_data: Dict (optional)
+                - calendar_data: Dict (optional)
+                - next_meeting_in_minutes: int (optional)
+        
+        Returns:
+            Dict containing the suggested break
+        """
+        # Create a concise context description for the user prompt
+        user_content = self._create_context_description(context)
+        
+        # Create messages array with system, user, and assistant roles
+        messages = [
+            {
+                "role": "system", 
+                "content": "You are a wellness assistant that gives kind, timely micro-suggestions."
+            },
+            {
+                "role": "user", 
+                "content": user_content
+            }
+        ]
+        
+        # Add previous assistant message if we have one
+        if self.last_suggestion:
+            messages.append({
+                "role": "assistant",
+                "content": json.dumps(self.last_suggestion)
+            })
+        
+        try:
+            # Using Ollama's chat completions API with messages array
+            response = requests.post(
+                f"{self.base_url}/api/chat",
+                json={
+                    "model": self.model,
+                    "messages": messages,
+                    "stream": False
+                }
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            suggestion = self._parse_break_suggestion(result['message']['content'])
+            
+            # Store this suggestion for future context
+            self.last_suggestion = suggestion
+            
+            return suggestion
+            
+        except Exception as e:
+            logger.error(f"Failed to generate break suggestion: {str(e)}")
+            fallback = self._get_fallback_suggestion(context)
+            self.last_suggestion = fallback
+            return fallback
+    
+    def _create_context_description(self, context: Dict) -> str:
+        """Create a concise context description for the user message"""
+        time_of_day = context.get('time_of_day', 'afternoon')
+        active_duration = context.get('active_duration', 45)
+        activity_level = context.get('activity_level', 0.5)
+        
+        # Check if we have focus information
+        focus_info = ""
+        if 'focus_data' in context:
+            focus_level = context['focus_data'].get('focus_level', 'unknown')
+            focus_mode = context['focus_data'].get('focus_mode', 'normal')
+            focus_info = f" Their focus level is {focus_level} in {focus_mode} mode."
+        
+        # Check if we have calendar information
+        meeting_info = ""
+        if 'next_meeting_in_minutes' in context:
+            next_meeting = context['next_meeting_in_minutes']
+            if next_meeting > 0:
+                meeting_info = f" They have a meeting in {next_meeting} minutes."
+        
+        # Create concise description
+        return f"The user has worked for {active_duration} minutes during the {time_of_day} with activity level {activity_level:.1f}/1.0.{focus_info}{meeting_info} Please suggest a suitable micro-break in JSON format: {{\"title\": \"...\", \"activity\": \"...\", \"duration\": X, \"benefits\": [...], \"type\": \"...\"}}"
             
     def generate_break_suggestion(self, context: Dict) -> Dict:
         """
@@ -228,7 +317,7 @@ Give 2-3 short, actionable work-life balance tips.
     
     def _get_fallback_suggestion(self, context: Dict) -> Dict:
         """Get fallback break suggestion when Ollama fails"""
-        time_of_day = context['time_of_day']
+        time_of_day = context.get('time_of_day', 'afternoon')
         
         if time_of_day == "morning":
             return {
