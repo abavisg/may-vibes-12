@@ -10,6 +10,9 @@
     --success-color: #10B981;
     --warning-color: #F59E0B;
     --danger-color: #EF4444;
+    --card-bg: #ffffff;
+    --card-bg-active: #f8fff8;
+    --text-muted: #888888;
 }
 
 * {
@@ -36,6 +39,21 @@ header {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: var(--surface-color);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.75rem;
 }
 
 h1 {
@@ -49,9 +67,9 @@ h1 {
     align-items: center;
     gap: 0.5rem;
     padding: 0.5rem 1rem;
-    background-color: var(--surface-color);
+    background-color: var(--background-color);
     border-radius: 9999px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    border: 1px solid var(--border-color);
 }
 
 .dot {
@@ -59,6 +77,7 @@ h1 {
     height: 8px;
     background-color: var(--success-color);
     border-radius: 50%;
+    box-shadow: 0 0 6px var(--success-color);
 }
 
 .status-text {
@@ -132,17 +151,99 @@ h2 {
 }
 
 .event-item {
+    background: var(--card-bg);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 1rem;
+    align-items: flex-start;
+    transition: all 0.3s ease;
     border: 1px solid var(--border-color);
-    border-radius: 0.375rem;
+}
+
+.event-item.active {
+    border-color: var(--success-color);
+    background: var(--card-bg-active);
+}
+
+.event-status {
+    margin-right: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.event-status.active .status-dot {
+    background: var(--success-color);
+    box-shadow: 0 0 10px var(--success-color);
+}
+
+.status-text {
+    font-size: 0.8em;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.event-details {
+    flex: 1;
+}
+
+.event-title {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin-bottom: 5px;
+    color: var(--text-primary);
 }
 
 .event-time {
-    font-size: 0.875rem;
+    font-size: 0.9em;
     color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.event-location {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+}
+
+.event-description {
+    font-size: 0.9em;
+    color: var(--text-secondary);
+    margin: 8px 0;
+    line-height: 1.4;
+}
+
+.event-attendees {
+    font-size: 0.85em;
+    color: var(--text-muted);
+}
+
+.no-events {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.error {
+    color: var(--danger-color);
+    text-align: center;
+    padding: 20px;
+}
+
+/* Icons */
+.fas {
+    margin-right: 5px;
 }
 
 .actions {
@@ -151,32 +252,38 @@ h2 {
     justify-content: center;
 }
 
-.primary-button, .secondary-button {
-    padding: 0.75rem 1.5rem;
+.btn {
+    padding: 0.75rem 1.25rem;
     border-radius: 0.375rem;
+    font-size: 0.875rem;
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s;
-}
-
-.primary-button {
-    background-color: var(--primary-color);
-    color: white;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
     border: none;
 }
 
-.primary-button:hover {
-    background-color: var(--primary-hover);
+.btn.primary {
+    background-color: var(--primary-color);
+    color: white;
 }
 
-.secondary-button {
-    background-color: white;
+.btn.primary:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.btn.secondary {
+    background-color: var(--background-color);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
 }
 
-.secondary-button:hover {
-    background-color: var(--background-color);
+.btn.secondary:hover {
+    background-color: var(--border-color);
+    transform: translateY(-1px);
 }
 
 .notification {
@@ -188,6 +295,19 @@ h2 {
     padding: 1.5rem;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     max-width: 400px;
+    border: 1px solid var(--border-color);
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
 }
 
 .notification.hidden {

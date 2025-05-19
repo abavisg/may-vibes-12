@@ -77,6 +77,49 @@ async function updateStatus() {
     }
 }
 
+// Format time in 12-hour format with AM/PM
+function formatEventTime(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+    });
+}
+
+// Check if an event is currently happening
+function isEventActive(event) {
+    const now = new Date();
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    return now >= start && now <= end;
+}
+
+// Get relative time description
+function getEventTiming(event) {
+    const now = new Date();
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    
+    if (now < start) {
+        const diffMinutes = Math.round((start - now) / (1000 * 60));
+        if (diffMinutes < 60) {
+            return `Starting in ${diffMinutes} minutes`;
+        }
+        const diffHours = Math.round(diffMinutes / 60);
+        return `Starting in ${diffHours} hours`;
+    } else if (now <= end) {
+        const diffMinutes = Math.round((end - now) / (1000 * 60));
+        if (diffMinutes < 60) {
+            return `Ending in ${diffMinutes} minutes`;
+        }
+        const diffHours = Math.round(diffMinutes / 60);
+        return `Ending in ${diffHours} hours`;
+    } else {
+        return 'Ended';
+    }
+}
+
 // Update calendar events
 async function updateCalendar() {
     try {
@@ -87,20 +130,31 @@ async function updateCalendar() {
         eventsList.innerHTML = '';
         
         if (data.events && data.events.length > 0) {
+            data.events.sort((a, b) => new Date(a.start) - new Date(b.start));
+            
             data.events.forEach(event => {
-                // Handle both formats (start/end and start_time/end_time)
-                const startTime = new Date(event.start || event.start_time);
-                const endTime = new Date(event.end || event.end_time);
+                const startTime = formatEventTime(event.start);
+                const endTime = formatEventTime(event.end);
+                const isActive = isEventActive(event);
+                const timing = getEventTiming(event);
                 
                 const eventElement = document.createElement('div');
-                eventElement.className = 'event-item';
+                eventElement.className = `event-item ${isActive ? 'active' : ''}`;
                 eventElement.innerHTML = `
+                    <div class="event-status ${isActive ? 'active' : ''}">
+                        <div class="status-dot"></div>
+                        <div class="status-text">${timing}</div>
+                    </div>
                     <div class="event-details">
                         <div class="event-title">${event.summary}</div>
-                        <div class="event-time">
-                            ${startTime.toLocaleTimeString()} - ${endTime.toLocaleTimeString()}
-                        </div>
-                        ${event.location ? `<div class="event-location">${event.location}</div>` : ''}
+                        <div class="event-time">${startTime} - ${endTime}</div>
+                        ${event.location ? `<div class="event-location"><i class="fas fa-map-marker-alt"></i> ${event.location}</div>` : ''}
+                        ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
+                        ${event.attendees && event.attendees.length > 0 ? 
+                            `<div class="event-attendees">
+                                <i class="fas fa-users"></i> ${event.attendees.length} attendee${event.attendees.length > 1 ? 's' : ''}
+                            </div>` : ''
+                        }
                     </div>
                 `;
                 eventsList.appendChild(eventElement);
@@ -108,7 +162,7 @@ async function updateCalendar() {
             
             console.log('Calendar updated with events:', data.events);
         } else {
-            eventsList.innerHTML = '<div class="no-events">No upcoming events</div>';
+            eventsList.innerHTML = '<div class="no-events">No events scheduled for today</div>';
             console.log('No upcoming events found');
         }
     } catch (error) {
@@ -147,6 +201,11 @@ function showBreakNotification(message, duration) {
     messageElement.textContent = message;
     notification.classList.remove('hidden');
     
+    // Auto-hide notification after 10 seconds
+    setTimeout(() => {
+        notification.classList.add('hidden');
+    }, 10000);
+    
     // Also show system notification if permitted
     if (Notification.permission === 'granted') {
         new Notification('Work/Life Balance Coach', {
@@ -157,5 +216,31 @@ function showBreakNotification(message, duration) {
 }
 
 // Add event listeners for buttons
-document.getElementById('takeBreak').addEventListener('click', takeBreak);
-document.getElementById('postponeBreak').addEventListener('click', postponeBreak); 
+document.addEventListener('DOMContentLoaded', () => {
+    const takeBreakBtn = document.getElementById('takeBreak');
+    const postponeBreakBtn = document.getElementById('postponeBreak');
+    
+    takeBreakBtn.addEventListener('click', async () => {
+        try {
+            await takeBreak();
+            showBreakNotification('Enjoy your break! Take time to stretch and relax.');
+        } catch (error) {
+            console.error('Failed to start break:', error);
+        }
+    });
+    
+    postponeBreakBtn.addEventListener('click', () => {
+        document.getElementById('notification').classList.add('hidden');
+    });
+    
+    // Request notification permission
+    if (Notification.permission !== 'granted') {
+        Notification.requestPermission();
+    }
+    
+    // Start periodic updates
+    updateStatus();
+    updateCalendar();
+    setInterval(updateStatus, 5000);  // Update every 5 seconds
+    setInterval(updateCalendar, 300000);  // Update calendar every 5 minutes
+}); 

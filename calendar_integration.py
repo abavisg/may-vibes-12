@@ -29,6 +29,15 @@ class CalendarService:
         self.user_email = None
         self.timezone = Config.get_timezone()
         
+        # For local calendar, use a mocked time at 9 AM
+        if not self.use_google_calendar:
+            self.mock_current_time = datetime.now(self.timezone).replace(
+                hour=9, minute=0, second=0, microsecond=0
+            )
+            logger.debug(f"Using mocked current time: {self.mock_current_time}")
+        else:
+            self.mock_current_time = None
+        
         logger.debug(f"Calendar Service initialized with: use_google_calendar={self.use_google_calendar}, local_file={self.local_calendar_file}")
         
         if self.use_google_calendar and Config.is_google_calendar_configured():
@@ -79,10 +88,16 @@ class CalendarService:
         """Get the email address associated with the calendar."""
         return self.user_email if self.use_google_calendar else None
     
+    def get_current_time(self) -> datetime:
+        """Get the current time, using mock time if in local calendar mode."""
+        if self.mock_current_time and not self.use_google_calendar:
+            return self.mock_current_time
+        return datetime.now(self.timezone)
+    
     def get_day_events(self, target_date: Optional[datetime] = None) -> List[Dict]:
         """Get all events for a specific day."""
         if not target_date:
-            target_date = datetime.now(self.timezone)
+            target_date = self.get_current_time()
             
         start_of_day = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
         end_of_day = start_of_day + timedelta(days=1)
@@ -218,14 +233,17 @@ class CalendarService:
     
     def get_upcoming_events(self, minutes_ahead: int = 120) -> List[Dict]:
         """Get upcoming calendar events within the specified time window."""
-        now = datetime.now(self.timezone)
-        end_time = now + timedelta(minutes=minutes_ahead)
+        now = self.get_current_time()
         
-        logger.debug(f"Looking for events between {now} and {end_time} (local timezone)")
+        # Get all events for today
+        start_of_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_of_day = start_of_day.replace(hour=23, minute=59, second=59)
+        
+        logger.debug(f"Looking for events between {start_of_day} and {end_of_day} (local timezone)")
         
         if self.use_google_calendar:
-            return self._get_google_calendar_events_for_range(now, end_time)
-        return self._get_local_calendar_events_for_range(now, end_time)
+            return self._get_google_calendar_events_for_range(start_of_day, end_of_day)
+        return self._get_local_calendar_events_for_range(start_of_day, end_of_day)
     
     def get_next_event(self) -> Optional[Dict]:
         """Get the next calendar event."""
@@ -234,7 +252,9 @@ class CalendarService:
     
     def is_free_for_next(self, minutes: int) -> bool:
         """Check if there are any events in the next X minutes."""
-        events = self.get_upcoming_events(minutes)
+        now = self.get_current_time()
+        end_time = now + timedelta(minutes=minutes)
+        events = self._get_local_calendar_events_for_range(now, end_time)
         return len(events) == 0
     
     def get_next_free_slot(self, min_duration: int = 15) -> Optional[datetime]:

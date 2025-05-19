@@ -14,13 +14,20 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
-activity_tracker = ActivityTracker(idle_threshold_seconds=300)  # 5 minutes threshold
+
+# Set up mock time for testing (9 AM)
+mock_time = datetime.now(Config.get_timezone()).replace(
+    hour=9, minute=0, second=0, microsecond=0
+)
+
+# Initialize services with mock time
+activity_tracker = ActivityTracker(idle_threshold_seconds=300, mock_time=mock_time)  # 5 minutes threshold
 calendar_service = CalendarService(use_google_calendar=False)  # Explicitly use local calendar
 wellness_suggestions = WellnessSuggestions()
 
 # Global variables for tracking state
-last_break_time = datetime.now()
-current_work_session_start = datetime.now()
+last_break_time = mock_time
+current_work_session_start = mock_time
 work_session_threshold = timedelta(minutes=45)
 
 def check_work_patterns():
@@ -29,7 +36,7 @@ def check_work_patterns():
     """
     global last_break_time, current_work_session_start
     
-    current_time = datetime.now()
+    current_time = calendar_service.get_current_time()
     active_duration = current_time - current_work_session_start
     
     # Only suggest breaks if the system is active
@@ -61,7 +68,7 @@ def index():
 @app.route('/api/status')
 def get_status():
     """Get current work/break status and statistics"""
-    current_time = datetime.now()
+    current_time = calendar_service.get_current_time()
     active_duration = current_time - current_work_session_start
     
     # Get detailed activity stats
@@ -119,7 +126,7 @@ def take_break():
     )
     
     # Update timing
-    last_break_time = datetime.now()
+    last_break_time = calendar_service.get_current_time()
     current_work_session_start = last_break_time + timedelta(
         minutes=wellness_suggestions.user_prefs.get_optimal_break_duration(break_type)
     )

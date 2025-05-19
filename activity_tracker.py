@@ -2,77 +2,66 @@ import psutil
 import time
 from datetime import datetime, timedelta
 import logging
-from threading import Thread, Event
+import pytz
+from config import Config
 
 logger = logging.getLogger(__name__)
 
 class ActivityTracker:
-    def __init__(self, idle_threshold_seconds=300):  # 5 minutes default
+    def __init__(self, idle_threshold_seconds: int = 300, mock_time: datetime = None):
+        """
+        Initialize the activity tracker.
+        Args:
+            idle_threshold_seconds: Number of seconds of inactivity before considered idle
+            mock_time: Optional mock current time for testing
+        """
         self.idle_threshold = idle_threshold_seconds
-        self.last_activity = datetime.now()
-        self.is_running = False
-        self.stop_event = Event()
-        self.tracking_thread = None
-        
+        self.last_activity = 0
+        self.running = False
+        self.mock_time = mock_time
+        self.timezone = Config.get_timezone()
+    
+    def get_current_time(self) -> datetime:
+        """Get the current time, using mock time if set."""
+        if self.mock_time:
+            return self.mock_time
+        return datetime.now(self.timezone)
+    
     def start(self):
-        """Start the activity tracking."""
-        if self.is_running:
-            return
-            
-        self.is_running = True
-        self.stop_event.clear()
-        self.tracking_thread = Thread(target=self._track_activity, daemon=True)
-        self.tracking_thread.start()
+        """Start monitoring system activity."""
+        self.running = True
+        self.last_activity = time.time()
         logger.info("Activity tracking started")
     
     def stop(self):
-        """Stop the activity tracking."""
-        self.is_running = False
-        self.stop_event.set()
-        if self.tracking_thread:
-            self.tracking_thread.join()
+        """Stop monitoring system activity."""
+        self.running = False
         logger.info("Activity tracking stopped")
     
-    def _track_activity(self):
-        """Background thread to track system activity."""
-        while not self.stop_event.is_set():
-            try:
-                # Get CPU usage as a percentage
-                cpu_percent = psutil.cpu_percent(interval=1)
-                
-                # Get memory usage
-                memory = psutil.virtual_memory()
-                
-                # Get disk IO counters
-                disk_io = psutil.disk_io_counters()
-                
-                # If there's significant activity, update the last activity time
-                if (cpu_percent > 10 or  # CPU activity above 10%
-                    memory.percent > 75 or  # High memory usage
-                    disk_io.read_bytes + disk_io.write_bytes > 1024 * 1024):  # At least 1MB IO
-                    self.last_activity = datetime.now()
-                
-                time.sleep(1)  # Check every second
-                
-            except Exception as e:
-                logger.error(f"Error tracking activity: {e}")
-                time.sleep(5)  # Wait a bit longer if there's an error
-    
-    def is_active(self) -> bool:
-        """Check if the system is currently active."""
-        time_since_activity = datetime.now() - self.last_activity
-        return time_since_activity.total_seconds() < self.idle_threshold
-    
-    def get_idle_duration(self) -> timedelta:
-        """Get how long the system has been idle."""
-        return datetime.now() - self.last_activity
+    def update_activity(self):
+        """Update the last activity timestamp."""
+        self.last_activity = time.time()
     
     def get_activity_stats(self) -> dict:
         """Get current activity statistics."""
+        if not self.running:
+            return {
+                "is_active": False,
+                "idle_duration": 0,
+                "cpu_percent": 0,
+                "memory_percent": 0
+            }
+        
+        current_time = time.time()
+        idle_duration = current_time - self.last_activity
+        
         return {
-            'is_active': self.is_active(),
-            'idle_duration': self.get_idle_duration().total_seconds(),
-            'cpu_percent': psutil.cpu_percent(interval=0.1),
-            'memory_percent': psutil.virtual_memory().percent,
-            'last_activity': self.last_activity.isoformat()
-        } 
+            "is_active": idle_duration < self.idle_threshold,
+            "idle_duration": int(idle_duration),
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent
+        }
+    
+    def is_active(self) -> bool:
+        """Check if the system is currently active."""
+        return self.get_activity_stats()["is_active"] 
