@@ -24,6 +24,55 @@
         </header>
 
         <main>
+            <section class="wellness-score">
+                <div class="score-card">
+                    <h2>Wellness Score</h2>
+                    <div class="score-circle">
+                        <div class="score-value">100</div>
+                        <div class="score-trend">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Improving</span>
+                        </div>
+                    </div>
+                    <div class="score-components">
+                        <div class="component">
+                            <label>Break Compliance</label>
+                            <div class="progress-bar">
+                                <div class="progress" data-component="break_compliance"></div>
+                            </div>
+                        </div>
+                        <div class="component">
+                            <label>Work Duration</label>
+                            <div class="progress-bar">
+                                <div class="progress" data-component="work_duration"></div>
+                            </div>
+                        </div>
+                        <div class="component">
+                            <label>Activity Balance</label>
+                            <div class="progress-bar">
+                                <div class="progress" data-component="activity_balance"></div>
+                            </div>
+                        </div>
+                        <div class="component">
+                            <label>Schedule Adherence</label>
+                            <div class="progress-bar">
+                                <div class="progress" data-component="schedule_adherence"></div>
+                            </div>
+                        </div>
+                        <div class="component">
+                            <label>System Usage</label>
+                            <div class="progress-bar">
+                                <div class="progress" data-component="system_usage"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="score-suggestions">
+                        <h3>Suggestions</h3>
+                        <ul id="wellnessSuggestions"></ul>
+                    </div>
+                </div>
+            </section>
+
             <section class="stats">
                 <div class="stat-card">
                     <h3>Working Time</h3>
@@ -34,8 +83,12 @@
                     <p id="lastBreak">Just now</p>
                 </div>
                 <div class="stat-card">
-                    <h3>Idle Time</h3>
-                    <p id="idleTime">0:00</p>
+                    <h3>Break Stats</h3>
+                    <p><span id="breaksTaken">0</span> / <span id="breaksSuggested">0</span></p>
+                </div>
+                <div class="stat-card">
+                    <h3>Meeting Stats</h3>
+                    <p><span id="meetingsAttended">0</span> / <span id="totalMeetings">0</span></p>
                 </div>
             </section>
 
@@ -58,6 +111,12 @@
 
             <section class="calendar">
                 <h2><i class="fas fa-calendar"></i> Today's Schedule</h2>
+                <div class="calendar-legend">
+                    <span class="legend-item"><i class="fas fa-circle past"></i> Past</span>
+                    <span class="legend-item"><i class="fas fa-circle current"></i> Current</span>
+                    <span class="legend-item"><i class="fas fa-circle upcoming"></i> Upcoming</span>
+                    <span class="legend-item"><i class="fas fa-circle break"></i> Break</span>
+                </div>
                 <div id="eventsList" class="events-list">
                     <div class="loading">Loading events...</div>
                 </div>
@@ -66,6 +125,10 @@
 
         <div id="notification" class="notification hidden">
             <p id="notificationMessage"></p>
+            <div class="notification-actions">
+                <button class="btn primary" id="notificationAccept">Accept</button>
+                <button class="btn secondary" id="notificationDismiss">Dismiss</button>
+            </div>
         </div>
     </div>
 

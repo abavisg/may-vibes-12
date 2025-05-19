@@ -50,6 +50,51 @@ function updateProgressBar(elementId, value) {
     }
 }
 
+// Update wellness score visualization
+function updateWellnessScore(wellnessData) {
+    // Update main score
+    const scoreValue = document.querySelector('.score-value');
+    scoreValue.textContent = Math.round(wellnessData.current_score);
+    
+    // Update trend
+    const trendIcon = document.querySelector('.score-trend i');
+    const trendText = document.querySelector('.score-trend span');
+    
+    trendIcon.className = 'fas';
+    switch (wellnessData.trend) {
+        case 'improving':
+            trendIcon.classList.add('fa-arrow-up');
+            trendText.textContent = 'Improving';
+            break;
+        case 'declining':
+            trendIcon.classList.add('fa-arrow-down');
+            trendText.textContent = 'Declining';
+            break;
+        default:
+            trendIcon.classList.add('fa-arrow-right');
+            trendText.textContent = 'Stable';
+    }
+    
+    // Update component scores
+    Object.entries(wellnessData.components).forEach(([component, value]) => {
+        const progressBar = document.querySelector(`[data-component="${component}"]`);
+        if (progressBar) {
+            progressBar.style.width = `${value}%`;
+            if (value < 70) {
+                progressBar.classList.add('warning');
+            } else if (value < 50) {
+                progressBar.classList.add('danger');
+            }
+        }
+    });
+    
+    // Update suggestions
+    const suggestionsList = document.getElementById('wellnessSuggestions');
+    suggestionsList.innerHTML = wellnessData.suggestions
+        .map(suggestion => `<li>${suggestion}</li>`)
+        .join('');
+}
+
 // Update status information
 async function updateStatus() {
     try {
@@ -59,7 +104,14 @@ async function updateStatus() {
         // Update working time and last break
         document.getElementById('workingTime').textContent = formatDuration(data.active_duration);
         document.getElementById('lastBreak').textContent = formatRelativeTime(data.last_break);
-        document.getElementById('idleTime').textContent = formatDuration(data.idle_duration);
+        
+        // Update break stats
+        document.getElementById('breaksTaken').textContent = data.break_stats.taken;
+        document.getElementById('breaksSuggested').textContent = data.break_stats.suggested;
+        
+        // Update meeting stats
+        document.getElementById('meetingsAttended').textContent = data.meeting_stats.attended;
+        document.getElementById('totalMeetings').textContent = data.meeting_stats.total;
         
         // Update system stats
         document.getElementById('cpuUsage').textContent = `${Math.round(data.system_stats.cpu_percent)}%`;
@@ -69,9 +121,19 @@ async function updateStatus() {
         updateProgressBar('cpuBar', data.system_stats.cpu_percent);
         updateProgressBar('memoryBar', data.system_stats.memory_percent);
         
+        // Update wellness score
+        if (data.wellness_score) {
+            updateWellnessScore(data.wellness_score);
+        }
+        
         // Update status indicator
         const statusDot = document.querySelector('.status-indicator .dot');
         statusDot.style.backgroundColor = data.is_active ? 'var(--success-color)' : 'var(--warning-color)';
+        
+        // Show break notification if needed
+        if (data.break_suggestion) {
+            showBreakNotification(data.break_suggestion.message, data.break_suggestion.duration);
+        }
     } catch (error) {
         console.error('Failed to update status:', error);
     }
@@ -87,12 +149,15 @@ function formatEventTime(dateString) {
     });
 }
 
-// Check if an event is currently happening
-function isEventActive(event) {
+// Get event status class
+function getEventStatusClass(event) {
     const now = new Date();
     const start = new Date(event.start);
     const end = new Date(event.end);
-    return now >= start && now <= end;
+    
+    if (now < start) return 'upcoming';
+    if (now > end) return 'past';
+    return 'current';
 }
 
 // Get relative time description
@@ -135,35 +200,23 @@ async function updateCalendar() {
             data.events.forEach(event => {
                 const startTime = formatEventTime(event.start);
                 const endTime = formatEventTime(event.end);
-                const isActive = isEventActive(event);
+                const statusClass = getEventStatusClass(event);
                 const timing = getEventTiming(event);
                 
                 const eventElement = document.createElement('div');
-                eventElement.className = `event-item ${isActive ? 'active' : ''}`;
+                eventElement.className = `event-card ${statusClass}`;
                 eventElement.innerHTML = `
-                    <div class="event-status ${isActive ? 'active' : ''}">
-                        <div class="status-dot"></div>
-                        <div class="status-text">${timing}</div>
-                    </div>
+                    <div class="event-time">${startTime} - ${endTime}</div>
                     <div class="event-details">
                         <div class="event-title">${event.summary}</div>
-                        <div class="event-time">${startTime} - ${endTime}</div>
+                        <div class="event-status">${timing}</div>
                         ${event.location ? `<div class="event-location"><i class="fas fa-map-marker-alt"></i> ${event.location}</div>` : ''}
-                        ${event.description ? `<div class="event-description">${event.description}</div>` : ''}
-                        ${event.attendees && event.attendees.length > 0 ? 
-                            `<div class="event-attendees">
-                                <i class="fas fa-users"></i> ${event.attendees.length} attendee${event.attendees.length > 1 ? 's' : ''}
-                            </div>` : ''
-                        }
                     </div>
                 `;
                 eventsList.appendChild(eventElement);
             });
-            
-            console.log('Calendar updated with events:', data.events);
         } else {
             eventsList.innerHTML = '<div class="no-events">No events scheduled for today</div>';
-            console.log('No upcoming events found');
         }
     } catch (error) {
         console.error('Failed to update calendar:', error);
@@ -172,34 +225,61 @@ async function updateCalendar() {
 }
 
 // Handle taking a break
-async function takeBreak() {
+async function takeBreak(breakType = 'stretch_break') {
     try {
-        await fetch('/api/take-break', {
-            method: 'POST'
+        const response = await fetch('/api/take-break', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                break_type: breakType,
+                accepted: true,
+                completed: true
+            })
         });
         
-        // Hide notification if visible
-        document.getElementById('notification').classList.add('hidden');
-        
-        // Update status immediately
-        updateStatus();
+        if (response.ok) {
+            // Hide notification if visible
+            document.getElementById('notification').classList.add('hidden');
+            // Update status immediately
+            updateStatus();
+        }
     } catch (error) {
         console.error('Failed to record break:', error);
     }
 }
 
-// Handle postponing a break
-function postponeBreak() {
-    document.getElementById('notification').classList.add('hidden');
+// Handle skipping a break
+async function skipBreak(breakType = 'stretch_break') {
+    try {
+        await fetch('/api/skip-break', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                break_type: breakType
+            })
+        });
+        
+        document.getElementById('notification').classList.add('hidden');
+        updateStatus();
+    } catch (error) {
+        console.error('Failed to skip break:', error);
+    }
 }
 
 // Show break notification
-function showBreakNotification(message, duration) {
+function showBreakNotification(message, duration, breakType = 'stretch_break') {
     const notification = document.getElementById('notification');
     const messageElement = document.getElementById('notificationMessage');
     
     messageElement.textContent = message;
     notification.classList.remove('hidden');
+    
+    // Store break type for use in accept/dismiss actions
+    notification.dataset.breakType = breakType;
     
     // Auto-hide notification after 10 seconds
     setTimeout(() => {
@@ -219,28 +299,26 @@ function showBreakNotification(message, duration) {
 document.addEventListener('DOMContentLoaded', () => {
     const takeBreakBtn = document.getElementById('takeBreak');
     const postponeBreakBtn = document.getElementById('postponeBreak');
+    const notificationAcceptBtn = document.getElementById('notificationAccept');
+    const notificationDismissBtn = document.getElementById('notificationDismiss');
     
-    takeBreakBtn.addEventListener('click', async () => {
-        try {
-            await takeBreak();
-            showBreakNotification('Enjoy your break! Take time to stretch and relax.');
-        } catch (error) {
-            console.error('Failed to start break:', error);
-        }
+    takeBreakBtn.addEventListener('click', () => takeBreak());
+    postponeBreakBtn.addEventListener('click', () => skipBreak());
+    
+    notificationAcceptBtn.addEventListener('click', () => {
+        const notification = document.getElementById('notification');
+        const breakType = notification.dataset.breakType || 'stretch_break';
+        takeBreak(breakType);
     });
     
-    postponeBreakBtn.addEventListener('click', () => {
-        document.getElementById('notification').classList.add('hidden');
+    notificationDismissBtn.addEventListener('click', () => {
+        const notification = document.getElementById('notification');
+        const breakType = notification.dataset.breakType || 'stretch_break';
+        skipBreak(breakType);
     });
     
     // Request notification permission
     if (Notification.permission !== 'granted') {
         Notification.requestPermission();
     }
-    
-    // Start periodic updates
-    updateStatus();
-    updateCalendar();
-    setInterval(updateStatus, 5000);  // Update every 5 seconds
-    setInterval(updateCalendar, 300000);  // Update calendar every 5 minutes
 }); 
