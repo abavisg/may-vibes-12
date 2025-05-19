@@ -9,3 +9,13 @@
 /backup
 /docs
 /tests
+
+/__pycache__/
+
+/secrets/
+/logs/
+/data/
+/cache/
+/temp/
+/backup/
+/docs/

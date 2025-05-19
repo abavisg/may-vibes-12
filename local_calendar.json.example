@@ -2,24 +2,27 @@
     "events": [
         {
             "id": "1",
-            "summary": "Daily Standup",
-            "start_time": "2024-05-13T10:00:00+00:00",
-            "end_time": "2024-05-13T10:30:00+00:00",
-            "recurrence": "daily"
+            "summary": "Team Meeting",
+            "start": "2024-05-15T10:00:00Z",
+            "end": "2024-05-15T11:00:00Z",
+            "description": "Weekly team sync",
+            "location": "Conference Room A"
         },
         {
             "id": "2",
             "summary": "Lunch Break",
-            "start_time": "2024-05-13T12:00:00+00:00",
-            "end_time": "2024-05-13T13:00:00+00:00",
-            "recurrence": "daily"
+            "start": "2024-05-15T12:00:00Z",
+            "end": "2024-05-15T13:00:00Z",
+            "description": "Regular lunch break",
+            "location": "Break Room"
         },
         {
             "id": "3",
-            "summary": "Team Meeting",
-            "start_time": "2024-05-13T15:00:00+00:00",
-            "end_time": "2024-05-13T16:00:00+00:00",
-            "recurrence": "weekly"
+            "summary": "Project Review",
+            "start": "2024-05-15T14:00:00Z",
+            "end": "2024-05-15T15:00:00Z",
+            "description": "Monthly project status review",
+            "location": "Virtual Meeting"
         }
     ]
 } 

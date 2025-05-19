@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 scheduler = BackgroundScheduler()
-activity_tracker = ActivityTracker()
+activity_tracker = ActivityTracker(idle_threshold_seconds=300)  # 5 minutes threshold
 calendar_service = CalendarService()
 
 # Global variables for tracking state
@@ -31,15 +31,21 @@ def check_work_patterns():
     current_time = datetime.now()
     active_duration = current_time - current_work_session_start
     
-    if active_duration > work_session_threshold:
-        # Check calendar for availability
-        next_meeting = calendar_service.get_next_event()
-        if not next_meeting or (next_meeting['start'] - current_time).total_seconds() > 900:  # 15 minutes buffer
-            return {
-                "type": "break_needed",
-                "message": "Time for a short break! You've been working for a while.",
-                "duration": break_duration.total_seconds()
-            }
+    # Only suggest breaks if the system is active
+    if activity_tracker.is_active():
+        if active_duration > work_session_threshold:
+            # Check calendar for availability
+            next_meeting = calendar_service.get_next_event()
+            if not next_meeting or (next_meeting['start'] - current_time).total_seconds() > 900:  # 15 minutes buffer
+                return {
+                    "type": "break_needed",
+                    "message": "Time for a short break! You've been working for a while.",
+                    "duration": break_duration.total_seconds()
+                }
+    else:
+        # If system is idle, consider it a break
+        last_break_time = current_time
+        current_work_session_start = current_time
     
     return None
 
@@ -54,10 +60,18 @@ def get_status():
     current_time = datetime.now()
     active_duration = current_time - current_work_session_start
     
+    # Get detailed activity stats
+    activity_stats = activity_tracker.get_activity_stats()
+    
     return jsonify({
         "active_duration": active_duration.total_seconds(),
         "last_break": last_break_time.isoformat(),
-        "is_active": activity_tracker.is_active()
+        "is_active": activity_stats['is_active'],
+        "idle_duration": activity_stats['idle_duration'],
+        "system_stats": {
+            "cpu_percent": activity_stats['cpu_percent'],
+            "memory_percent": activity_stats['memory_percent']
+        }
     })
 
 @app.route('/api/calendar')

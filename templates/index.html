@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work/Life Balance Coach</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Work/Life Balance Coach</h1>
+            <div class="status-indicator" id="activeStatus">
+                <span class="dot"></span>
+                <span class="status-text">Monitoring</span>
+            </div>
+        </header>
+
+        <main>
+            <section class="current-status">
+                <h2>Current Session</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <label>Working Time</label>
+                        <span id="workingTime">0:00</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>Last Break</label>
+                        <span id="lastBreak">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>Idle Time</label>
+                        <span id="idleTime">0:00</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="system-stats">
+                <h2>System Activity</h2>
+                <div class="stats">
+                    <div class="stat-item">
+                        <label>CPU Usage</label>
+                        <span id="cpuUsage">0%</span>
+                        <div class="progress-bar">
+                            <div class="progress" id="cpuBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="stat-item">
+                        <label>Memory Usage</label>
+                        <span id="memoryUsage">0%</span>
+                        <div class="progress-bar">
+                            <div class="progress" id="memoryBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="calendar-events">
+                <h2>Upcoming Events</h2>
+                <div id="eventsList" class="events-list">
+                    <div class="loading">Loading events...</div>
+                </div>
+            </section>
+
+            <section class="actions">
+                <button id="takeBreak" class="primary-button">Take a Break</button>
+                <button id="postponeBreak" class="secondary-button">Postpone Break</button>
+            </section>
+        </main>
+
+        <div id="notification" class="notification hidden">
+            <div class="notification-content">
+                <p id="notificationMessage"></p>
+                <div class="notification-actions">
+                    <button class="primary-button" onclick="takeBreak()">Take Break</button>
+                    <button class="secondary-button" onclick="postponeBreak()">Postpone</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html> 
