@@ -16,9 +16,9 @@
     "creative_break": 7
   },
   "break_type_weights": {
-    "eye_break": 1.0,
-    "stretch_break": 1.0,
-    "walk_break": 1.0,
+    "eye_break": 1.0566556110000005,
+    "stretch_break": 1.0566556110000005,
+    "walk_break": 2.0,
     "hydration_break": 1.0,
     "posture_break": 1.0,
     "deep_breathing": 1.0,

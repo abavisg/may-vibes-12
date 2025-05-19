@@ -107,31 +107,56 @@ def update_wellness_metrics():
         current_time = calendar_service.get_current_time()
         activity_stats = activity_tracker.get_activity_stats()
         
-        # Get enhanced focus data from the agent
-        agent_state = activity_tracker.act("update")
-        focus_level = agent_state.get('focus_level', 'unknown')
-        focus_mode = activity_tracker.get_focus_mode()
-        focus_history = activity_tracker.get_focus_history()
+        # Check if we have simulated data
+        simulated_focus_info = cm.get_context("focus_monitor_agent.state")
+        simulated_metrics = cm.get_context("focus_monitor_agent.metrics")
         
-        # Calculate active duration from idle duration
-        active_minutes = max(0, (current_time - current_work_session_start).total_seconds() - activity_stats['idle_duration']) / 60
-        rest_minutes = activity_stats['idle_duration'] / 60
+        if simulated_focus_info:
+            # Use simulated data
+            focus_level = simulated_focus_info.get('focus_level', 'unknown')
+            focus_mode = simulated_focus_info.get('focus_mode', 'idle') 
+            idle_time = simulated_focus_info.get('idle_time', 0)
+            
+            # Get metrics from simulation
+            cpu_percent = simulated_metrics.get('cpu_usage', activity_stats['cpu_percent'])
+            memory_percent = simulated_metrics.get('memory_usage', activity_stats['memory_percent'])
+            
+            # Force a long active duration for the simulation
+            active_duration = timedelta(hours=1)
+            active_minutes = 60
+            rest_minutes = idle_time / 60
+        else:
+            # Use real activity tracking data
+            agent_state = activity_tracker.act("update")
+            focus_level = agent_state.get('focus_level', 'unknown')
+            focus_mode = activity_tracker.get_focus_mode()
+            focus_history = activity_tracker.get_focus_history()
+            
+            # Calculate active duration from idle duration
+            active_minutes = max(0, (current_time - current_work_session_start).total_seconds() - activity_stats['idle_duration']) / 60
+            rest_minutes = activity_stats['idle_duration'] / 60
+            cpu_percent = activity_stats['cpu_percent']
+            memory_percent = activity_stats['memory_percent']
+            active_duration = current_time - current_work_session_start
         
         metrics = {
             'breaks_taken': breaks_taken,
             'breaks_suggested': breaks_suggested,
-            'active_duration': current_time - current_work_session_start,
+            'active_duration': active_duration,
             'active_minutes': active_minutes,
             'rest_minutes': rest_minutes,
             'meetings_attended': meetings_attended,
             'total_meetings': total_meetings,
-            'cpu_percent': activity_stats['cpu_percent'],
-            'memory_percent': activity_stats['memory_percent'],
+            'cpu_percent': cpu_percent,
+            'memory_percent': memory_percent,
             'focus_level': focus_level,
-            'focus_mode': focus_mode,
-            'focus_history': {hour: patterns[-1] if patterns else 'unknown' 
-                             for hour, patterns in focus_history.items()}
+            'focus_mode': focus_mode
         }
+        
+        # Add focus history if available
+        if 'focus_history' in locals():
+            metrics['focus_history'] = {hour: patterns[-1] if patterns else 'unknown' 
+                                      for hour, patterns in focus_history.items()}
         
         wellness_score.update_score(metrics)
         
@@ -177,10 +202,46 @@ def get_dashboard_data():
     # Get activity stats
     activity_stats = activity_tracker.get_activity_stats()
     
-    # Get focus information
-    agent_state = activity_tracker.act("update")
-    focus_level = agent_state.get('focus_level', 'unknown')
-    focus_mode = activity_tracker.get_focus_mode()
+    # First check if we have simulated focus info in context
+    simulated_focus_info = cm.get_context("focus_monitor_agent.state")
+    simulated_metrics = cm.get_context("focus_monitor_agent.metrics")
+    
+    if simulated_focus_info:
+        # Use simulated data if available
+        focus_level = simulated_focus_info.get('focus_level', 'unknown')
+        focus_mode = simulated_focus_info.get('focus_mode', 'idle')
+        active_apps = simulated_focus_info.get('active_apps', [])[:3]
+        idle_time = simulated_focus_info.get('idle_time', 0)
+        is_active = True  # Force active for simulation
+        
+        # Update activity stats with simulated metrics
+        if simulated_metrics:
+            activity_stats['cpu_percent'] = simulated_metrics.get('cpu_usage', activity_stats['cpu_percent'])
+            activity_stats['memory_percent'] = simulated_metrics.get('memory_usage', activity_stats['memory_percent'])
+    else:
+        # Use real activity tracking data
+        agent_state = activity_tracker.act("update")
+        focus_level = agent_state.get('focus_level', 'unknown')
+        focus_mode = activity_tracker.get_focus_mode()
+        active_apps = activity_tracker.perceptions.get('active_apps', [])[:3]
+        idle_time = activity_stats.get('idle_duration', 0)
+        is_active = activity_stats.get('is_active', False)
+    
+    # Get simulated time info if available
+    simulated_time_info = cm.get_context("context_agent.time")
+    if simulated_time_info:
+        is_working_hours = simulated_time_info.get('is_working_hours', True)
+    else:
+        is_working_hours = True  # Default to working hours
+    
+    # Calculate active duration accounting for simulated state
+    if simulated_focus_info:
+        active_duration = (current_time - current_work_session_start).total_seconds()
+        # For simulation, force some active time to trigger wellness score changes
+        if active_duration < 60:  # Less than a minute
+            active_duration = 3600  # Force to 1 hour
+    else:
+        active_duration = (current_time - current_work_session_start).total_seconds()
     
     # Calculate wellness metrics
     wellness_breakdown = wellness_score.get_score_breakdown()
@@ -196,18 +257,18 @@ def get_dashboard_data():
         'activity_stats': {
             'cpu_percent': activity_stats['cpu_percent'],
             'memory_percent': activity_stats['memory_percent'],
-            'is_active': activity_stats['is_active'],
-            'idle_duration': activity_stats['idle_duration'],
-            'active_duration': (current_time - current_work_session_start).total_seconds(),
+            'is_active': is_active,
+            'idle_duration': idle_time,
+            'active_duration': active_duration,
             'focus_level': focus_level,
             'focus_mode': focus_mode,
-            'active_applications': activity_tracker.perceptions.get('active_apps', [])[:3]
+            'active_applications': active_apps
         },
         'break_stats': {
             'taken': breaks_taken,
             'suggested': breaks_suggested,
             'last_break': last_break_time.isoformat(),
-            'working_time': (current_time - current_work_session_start).total_seconds()
+            'working_time': active_duration
         },
         'calendar_events': calendar_service.get_upcoming_events(),
         'meeting_stats': {

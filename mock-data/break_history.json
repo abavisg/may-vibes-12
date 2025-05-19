@@ -2,130 +2,18 @@
   "history": [
     {
       "break_type": "eye_break",
-      "timestamp": "2025-05-19T09:45:00+01:00",
+      "timestamp": "2025-05-19T12:30:00-00:01",
       "accepted": true,
-      "completed": true,
-      "effectiveness_rating": 4,
-      "energy_level_after": 4
-    },
-    {
-      "break_type": "stretch_break",
-      "timestamp": "2025-05-19T11:15:00+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": 5,
-      "energy_level_after": 5
-    },
-    {
-      "break_type": "walk_break",
-      "timestamp": "2025-05-19T14:15:00+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": 4,
-      "energy_level_after": 5
-    },
-    {
-      "break_type": "hydration_break",
-      "timestamp": "2025-05-19T15:45:00+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": 3,
-      "energy_level_after": 4
-    },
-    {
-      "break_type": "regular",
-      "timestamp": "2025-05-19T17:31:25.453900",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "regular",
-      "timestamp": "2025-05-19T17:31:39.999718",
-      "accepted": false,
       "completed": false,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "regular",
-      "timestamp": "2025-05-19T17:31:41.555529",
-      "accepted": false,
-      "completed": false,
-      "effectiveness_rating": null,
+      "effectiveness_rating": 2,
       "energy_level_after": null
     },
     {
       "break_type": "stretch_break",
-      "timestamp": "2025-05-19T17:32:31.869350",
+      "timestamp": "2025-05-19T13:30:00-00:01",
       "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T18:05:40.310689+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T18:05:43.061938+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T18:05:49.110963+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T18:05:51.751702+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T18:05:52.923389+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T19:02:25.453305+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T19:02:43.049461+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
-      "energy_level_after": null
-    },
-    {
-      "break_type": "user_initiated",
-      "timestamp": "2025-05-19T19:07:04.178545+01:00",
-      "accepted": true,
-      "completed": true,
-      "effectiveness_rating": null,
+      "completed": false,
+      "effectiveness_rating": 2,
       "energy_level_after": null
     }
   ]
