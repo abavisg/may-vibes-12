@@ -9,19 +9,82 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Work/Life Balance Coach</h1>
-            <div class="header-actions">
-                <div class="action-buttons">
-                    <button id="takeBreak" class="btn primary"><i class="fas fa-coffee"></i> Take Break</button>
-                    <button id="postponeBreak" class="btn secondary"><i class="fas fa-clock"></i> Postpone</button>
+        <header style="background-color: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); margin-bottom: 20px;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <h1 style="margin: 0; color: #343a40; font-size: 24px;">Work/Life Balance Coach</h1>
+                
+                <!-- Server-rendered date/time (no JavaScript needed) -->
+                <div style="display: flex; flex-wrap: wrap; gap: 15px; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-calendar-alt" style="color: #4a90e2;"></i>
+                        <span style="font-weight: 500; color: #333;">{{ formatted_date }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-clock" style="color: #4a90e2;"></i>
+                        <span style="font-weight: 500; color: #333;">{{ formatted_time }}</span>
+                    </div>
+                    <div style="display: inline-flex; align-items: center; gap: 5px; background-color: #ffc107; color: #000; padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <i class="fas fa-vial"></i>
+                        <span>Mock Mode</span>
+                    </div>
                 </div>
-                <div class="status-indicator">
-                    <div class="dot"></div>
-                    <span>System Active</span>
+                
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                    <div style="display: flex; gap: 10px;">
+                        <button id="takeBreak" style="padding: 8px 16px; background-color: #4a90e2; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-coffee"></i> Take Break
+                        </button>
+                        <button id="postponeBreak" style="padding: 8px 16px; background-color: #6c757d; color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-clock"></i> Postpone
+                        </button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <div style="width: 8px; height: 8px; border-radius: 50%; background-color: #28a745;"></div>
+                        <span>System Active</span>
+                    </div>
                 </div>
             </div>
         </header>
+
+        <!-- Original header (hidden) for JavaScript compatibility -->
+        <div style="display: none;">
+            <div class="header-content">
+                <div class="header-left">
+                    <h1>Work/Life Balance Coach</h1>
+                    {% if formatted_date and formatted_time %}
+                    <div class="date-time-container" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 15px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-calendar-alt" style="color: #4a90e2;"></i>
+                            <span style="font-weight: 500; color: #333;">{{ formatted_date }}</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-clock" style="color: #4a90e2;"></i>
+                            <span style="font-weight: 500; color: #333;">{{ formatted_time }}</span>
+                        </div>
+                        {% if is_mock_mode %}
+                        <div style="display: inline-flex; align-items: center; gap: 5px; background-color: #ffc107; color: #000; padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                            <i class="fas fa-vial"></i>
+                            <span>Mock Mode</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Keep the original container for JavaScript -->
+                    <div id="datetimeContainer" style="display: none;"></div>
+                </div>
+                <div class="header-actions">
+                    <div class="action-buttons">
+                        <button id="takeBreak" class="btn primary"><i class="fas fa-coffee"></i> Take Break</button>
+                        <button id="postponeBreak" class="btn secondary"><i class="fas fa-clock"></i> Postpone</button>
+                    </div>
+                    <div class="status-indicator">
+                        <div class="dot"></div>
+                        <span id="visibleSystemStatus">System Active</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <main>
             <section class="wellness-score">
@@ -132,7 +195,128 @@
         </div>
     </div>
 
+    <!-- Hidden elements for JavaScript compatibility -->
+    <div style="display: none !important;">
+        <span id="currentDate">{{ formatted_date }}</span>
+        <span id="currentTime">{{ formatted_time }}</span>
+        <div id="mockModeIndicator" class="mock-mode-indicator">Mock Mode</div>
+        <span id="systemStatus">System Active</span>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js" defer></script>
+    
+    <script>
+        // Immediately inject the date/time elements
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Direct injection script running...');
+            
+            // Add debug display
+            const debugDisplay = document.createElement('div');
+            debugDisplay.style.position = 'fixed';
+            debugDisplay.style.top = '10px';
+            debugDisplay.style.right = '10px';
+            debugDisplay.style.backgroundColor = 'red';
+            debugDisplay.style.color = 'white';
+            debugDisplay.style.padding = '10px';
+            debugDisplay.style.borderRadius = '5px';
+            debugDisplay.style.zIndex = '9999';
+            debugDisplay.style.fontSize = '12px';
+            debugDisplay.textContent = 'Debug: Loading...';
+            document.body.appendChild(debugDisplay);
+            
+            const datetimeContainer = document.getElementById('datetimeContainer');
+            if (!datetimeContainer) {
+                debugDisplay.textContent = 'ERROR: datetimeContainer not found!';
+                console.error('datetimeContainer not found!');
+                return;
+            }
+            
+            debugDisplay.textContent += '\nFound container, injecting...';
+            console.log('Injecting datetime elements...');
+            
+            // Create and inject the datetime HTML - USE ORIGINAL IDs that app.js expects
+            datetimeContainer.innerHTML = `
+                <div class="datetime-container" style="border: 2px solid red; padding: 5px; margin: 5px;">
+                    <div class="datetime" style="border: 2px solid blue; padding: 5px;">
+                        <div class="date-group" style="display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span id="currentDate" style="color: black; font-weight: bold;">Loading date...</span>
+                        </div>
+                        <div class="time-group" style="display: inline-flex; align-items: center; gap: 5px; margin-left: 10px;">
+                            <i class="fas fa-clock"></i>
+                            <span id="currentTime" style="color: black; font-weight: bold;">Loading time...</span>
+                        </div>
+                        <div id="mockModeIndicator" style="display: inline-flex; align-items: center; gap: 5px; background-color: yellow; color: black; padding: 3px 8px; border-radius: 10px; margin-left: 10px;">
+                            <i class="fas fa-vial"></i>
+                            <span>Mock Mode</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Get the newly created elements - using ORIGINAL IDs
+            const dateElement = document.getElementById('currentDate');
+            const timeElement = document.getElementById('currentTime');
+            const mockIndicator = document.getElementById('mockModeIndicator');
+            const systemStatus = document.createElement('span');
+            systemStatus.id = 'systemStatus';
+            systemStatus.textContent = 'System Active';
+            systemStatus.style.display = 'none';
+            document.body.appendChild(systemStatus);
+            
+            if (dateElement && timeElement && mockIndicator && systemStatus) {
+                debugDisplay.textContent += '\nAll required elements created successfully!';
+            } else {
+                debugDisplay.textContent += '\nERROR: Failed to create all elements!';
+                if (!dateElement) debugDisplay.textContent += ' Missing: currentDate';
+                if (!timeElement) debugDisplay.textContent += ' Missing: currentTime';
+                if (!mockIndicator) debugDisplay.textContent += ' Missing: mockModeIndicator';
+                if (!systemStatus) debugDisplay.textContent += ' Missing: systemStatus';
+            }
+            
+            // Update date and time
+            function updateDateTime() {
+                const now = new Date();
+                
+                if (dateElement) {
+                    dateElement.textContent = now.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                    });
+                }
+                
+                if (timeElement) {
+                    timeElement.textContent = now.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true
+                    });
+                }
+                
+                // Update debug info
+                debugDisplay.textContent = `Debug: ${new Date().toISOString()}\nElements: date=${!!dateElement}, time=${!!timeElement}, mock=${!!mockIndicator}, status=${!!systemStatus}`;
+            }
+            
+            // Update immediately and every second
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+            
+            // Fetch dashboard data to check mock mode
+            fetch('/api/dashboard')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Dashboard data received:', data);
+                    debugDisplay.textContent += '\nDashboard data received!';
+                })
+                .catch(error => {
+                    console.error('Error fetching dashboard data:', error);
+                    debugDisplay.textContent += '\nError fetching dashboard data!';
+                });
+        });
+    </script>
 </body>
 </html> 

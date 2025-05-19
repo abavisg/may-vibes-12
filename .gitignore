@@ -1,16 +1,11 @@
+/__pycache__/
+__pycache__/
+__pycache__/
+
 .env
 .venv
 
-/secrets
-/logs
-/data
-/cache
-/temp
-/backup
-/docs
-/tests
 
-/__pycache__/
 
 /secrets/
 /logs/

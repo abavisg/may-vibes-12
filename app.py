@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 from flask import Flask, render_template, jsonify, request, current_app
 from flask_socketio import SocketIO, emit
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -9,10 +12,6 @@ from wellness_suggestions import WellnessSuggestions
 from wellness_score import WellnessScore
 from config import Config
 import logging
-import eventlet
-
-# Use eventlet as async mode for better performance
-eventlet.monkey_patch()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +31,7 @@ mock_time = datetime.now(Config.get_timezone()).replace(
 
 # Initialize services with mock time
 activity_tracker = ActivityTracker(idle_threshold_seconds=300, mock_time=mock_time)
-calendar_service = CalendarService(use_google_calendar=False)
+calendar_service = CalendarService(use_google_calendar=False, mock_time=mock_time)
 wellness_suggestions = WellnessSuggestions()
 wellness_score = WellnessScore()
 
@@ -119,6 +118,13 @@ def get_dashboard_data():
     wellness_breakdown = wellness_score.get_score_breakdown()
     
     return {
+        'system_info': {
+            'mock_mode': True,  # Since we're using mock time
+            'current_time': current_time.isoformat(),
+            'is_active': activity_stats['is_active'],
+            'formatted_date': current_time.strftime('%A, %B %d, %Y'),
+            'formatted_time': current_time.strftime('%I:%M:%S %p')
+        },
         'wellness_score': wellness_breakdown,
         'activity_stats': {
             'cpu_percent': activity_stats['cpu_percent'],
@@ -143,7 +149,17 @@ def get_dashboard_data():
 @app.route('/')
 def index():
     """Render the main application interface"""
-    return render_template('index.html')
+    current_time = calendar_service.get_current_time()
+    formatted_date = current_time.strftime('%A, %B %d, %Y')
+    formatted_time = current_time.strftime('%I:%M:%S %p')
+    is_mock_mode = True  # Since we're using mock time
+    
+    return render_template(
+        'index.html',
+        formatted_date=formatted_date,
+        formatted_time=formatted_time,
+        is_mock_mode=is_mock_mode
+    )
 
 @app.route('/api/dashboard', methods=['GET'])
 def get_dashboard():

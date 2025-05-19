@@ -1,40 +1,102 @@
 // Main application class
 class WorkLifeBalanceApp {
     constructor() {
-        this.initializeElements();
-        this.initializeEventListeners();
-        this.initializeWebSocket();
-        this.requestNotificationPermission();
-        this.updateInterval = null;
-        this.startPeriodicUpdates();
+        this.initialized = false;
+        this.initAttempts = 0;
+        this.maxInitAttempts = 5;
+        
+        // Ensure Socket.IO is loaded
+        if (typeof io === 'undefined') {
+            console.error('Socket.IO not loaded. Waiting...');
+            setTimeout(() => this.initialize(), 500);
+            return;
+        }
+        
+        this.initialize();
+    }
+
+    initialize() {
+        if (this.initialized) return;
+        this.initAttempts++;
+        
+        console.log(`Initialization attempt ${this.initAttempts}...`);
+        
+        // Wait for DOM to be fully loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.init());
+            return;
+        }
+        
+        if (!this.initializeElements()) {
+            if (this.initAttempts < this.maxInitAttempts) {
+                console.warn(`Failed to initialize elements. Retrying in 1 second... (Attempt ${this.initAttempts}/${this.maxInitAttempts})`);
+                setTimeout(() => this.initialize(), 1000);
+            } else {
+                console.error('Failed to initialize after maximum attempts');
+            }
+            return;
+        }
+        
+        try {
+            this.initializeEventListeners();
+            this.initializeWebSocket();
+            this.requestNotificationPermission();
+            this.updateInterval = null;
+            this.startPeriodicUpdates();
+            this.startDateTimeUpdates();
+            
+            this.initialized = true;
+            console.log('Application initialized successfully');
+        } catch (error) {
+            console.error('Error during initialization:', error);
+        }
     }
 
     initializeElements() {
-        // Wellness score elements
+        console.log('Initializing elements...');
+        
+        // Date and time elements
+        this.currentDate = document.getElementById('currentDate');
+        this.currentTime = document.getElementById('currentTime');
+        this.mockModeIndicator = document.getElementById('mockModeIndicator');
+        this.systemStatus = document.getElementById('systemStatus');
+
+        // Check if all required elements are found
+        const requiredElements = {
+            currentDate: this.currentDate,
+            currentTime: this.currentTime,
+            mockModeIndicator: this.mockModeIndicator,
+            systemStatus: this.systemStatus
+        };
+
+        const missingElements = Object.entries(requiredElements)
+            .filter(([_, element]) => !element)
+            .map(([name]) => name);
+
+        if (missingElements.length > 0) {
+            console.error('Missing required elements:', missingElements);
+            return false;
+        }
+
+        // Initialize other elements
         this.scoreValue = document.querySelector('.score-value');
         this.scoreComponents = document.querySelectorAll('.progress[data-component]');
         this.suggestionsList = document.getElementById('wellnessSuggestions');
-
-        // Stats elements
         this.workingTime = document.getElementById('workingTime');
         this.lastBreak = document.getElementById('lastBreak');
         this.breaksTaken = document.getElementById('breaksTaken');
         this.breaksSuggested = document.getElementById('breaksSuggested');
         this.meetingsAttended = document.getElementById('meetingsAttended');
         this.totalMeetings = document.getElementById('totalMeetings');
-
-        // System stats elements
         this.cpuBar = document.getElementById('cpuBar');
         this.cpuUsage = document.getElementById('cpuUsage');
         this.memoryBar = document.getElementById('memoryBar');
         this.memoryUsage = document.getElementById('memoryUsage');
-
-        // Calendar elements
         this.eventsList = document.getElementById('eventsList');
-
-        // Notification elements
         this.notification = document.getElementById('notification');
         this.notificationMessage = document.getElementById('notificationMessage');
+
+        return true;
     }
 
     initializeEventListeners() {
@@ -48,25 +110,33 @@ class WorkLifeBalanceApp {
     }
 
     async initializeWebSocket() {
+        console.log('Initializing WebSocket...');
         try {
             this.socket = io();
             
             this.socket.on('connect', () => {
-                console.log('Connected to server');
+                console.log('WebSocket connected successfully');
+                // Request initial data
+                this.fetchDashboardData();
             });
             
             this.socket.on('dashboard_update', (data) => {
+                console.log('Received dashboard update:', data);
                 this.handleWebSocketMessage({
                     data: JSON.stringify(data)
                 });
             });
             
             this.socket.on('disconnect', () => {
-                console.log('Disconnected from server');
+                console.warn('WebSocket disconnected, attempting reconnection...');
                 setTimeout(() => this.initializeWebSocket(), 1000);
             });
+
+            this.socket.on('connect_error', (error) => {
+                console.error('WebSocket connection error:', error);
+            });
         } catch (error) {
-            console.error('Socket.IO connection failed:', error);
+            console.error('Error initializing WebSocket:', error);
             setTimeout(() => this.initializeWebSocket(), 1000);
         }
     }
@@ -88,9 +158,14 @@ class WorkLifeBalanceApp {
     }
 
     async fetchDashboardData() {
+        console.log('Fetching dashboard data...');
         try {
             const response = await fetch('/api/dashboard');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const data = await response.json();
+            console.log('Received dashboard data:', data);
             this.updateDashboard(data);
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -98,57 +173,89 @@ class WorkLifeBalanceApp {
     }
 
     updateDashboard(data) {
-        // Update wellness score
-        this.scoreValue.textContent = Math.round(data.wellness_score.current_score);
+        console.log('Updating dashboard with data:', data);
+        if (!data) {
+            console.error('No data provided to updateDashboard');
+            return;
+        }
 
-        // Update score components
-        this.scoreComponents.forEach(component => {
-            const name = component.dataset.component;
-            const value = data.wellness_score.components[name];
-            component.style.width = `${value}%`;
-        });
+        try {
+            // Update system info
+            const systemInfo = data.system_info || {};
+            console.log('System info:', systemInfo);
+            
+            if (this.mockModeIndicator) {
+                const isMockMode = !!systemInfo.mock_mode;
+                console.log('Setting mock mode:', isMockMode);
+                this.mockModeIndicator.classList.toggle('hidden', !isMockMode);
+                console.log('Mock mode indicator visibility updated');
+            }
 
-        // Update suggestions
-        this.suggestionsList.innerHTML = data.wellness_score.suggestions
-            .map(suggestion => `<li>${suggestion}</li>`)
-            .join('');
+            if (this.systemStatus) {
+                this.systemStatus.textContent = systemInfo.is_active ? 'System Active' : 'System Idle';
+                console.log('System status updated');
+            }
+            
+            // Update date/time display
+            if (systemInfo.mock_mode && systemInfo.current_time) {
+                console.log('Using mock time:', systemInfo.current_time);
+                const mockDate = new Date(systemInfo.current_time);
+                if (!isNaN(mockDate.getTime())) {
+                    this.updateDateTimeDisplay(mockDate);
+                } else {
+                    console.error('Invalid mock time:', systemInfo.current_time);
+                }
+            } else {
+                console.log('Using real time');
+                this.updateDateTime();
+            }
 
-        // Update system stats
-        this.updateSystemStats(data.activity_stats);
+            // Update wellness score
+            if (this.scoreValue && data.wellness_score) {
+                this.scoreValue.textContent = Math.round(data.wellness_score.current_score);
+            }
 
-        // Update calendar events
-        this.updateCalendarEvents(data.calendar_events);
+            // Update score components
+            this.scoreComponents.forEach(component => {
+                const name = component.dataset.component;
+                const value = data.wellness_score.components[name] || 0;
+                component.style.width = `${value}%`;
+            });
 
-        // Update break stats
-        this.updateBreakStats(data.break_stats);
-    }
+            // Update suggestions
+            this.suggestionsList.innerHTML = data.wellness_score.suggestions
+                .map(suggestion => `<li>${suggestion}</li>`)
+                .join('') || '<li>No suggestions available</li>';
 
-    updateSystemStats(stats) {
-        this.cpuBar.style.width = `${stats.cpu_percent}%`;
-        this.cpuUsage.textContent = `${Math.round(stats.cpu_percent)}%`;
-        this.memoryBar.style.width = `${stats.memory_percent}%`;
-        this.memoryUsage.textContent = `${Math.round(stats.memory_percent)}%`;
-    }
+            // Update system stats
+            const cpuPercent = Math.round(data.activity_stats.cpu_percent);
+            const memoryPercent = Math.round(data.activity_stats.memory_percent);
+            
+            this.cpuBar.style.width = `${cpuPercent}%`;
+            this.cpuUsage.textContent = `${cpuPercent}%`;
+            this.memoryBar.style.width = `${memoryPercent}%`;
+            this.memoryUsage.textContent = `${memoryPercent}%`;
 
-    updateCalendarEvents(events) {
-        this.eventsList.innerHTML = events.map(event => `
-            <div class="event-item ${event.status}">
-                <span class="event-time">${event.start_time} - ${event.end_time}</span>
-                <span class="event-title">${event.title}</span>
-            </div>
-        `).join('');
-    }
+            // Update calendar events
+            this.updateCalendarEvents(data.calendar_events);
 
-    updateBreakStats(stats) {
-        this.breaksTaken.textContent = stats.taken;
-        this.breaksSuggested.textContent = stats.suggested;
-        this.meetingsAttended.textContent = stats.meetings_attended;
-        this.totalMeetings.textContent = stats.total_meetings;
-        this.workingTime.textContent = this.formatDuration(stats.working_time);
-        this.lastBreak.textContent = this.formatLastBreak(stats.last_break);
+            // Update break stats
+            const breakStats = data.break_stats;
+            this.breaksTaken.textContent = breakStats.taken;
+            this.breaksSuggested.textContent = breakStats.suggested;
+            this.workingTime.textContent = this.formatDuration(breakStats.working_time);
+            this.lastBreak.textContent = this.formatLastBreak(breakStats.last_break);
+
+            // Update meeting stats
+            const meetingStats = data.meeting_stats;
+            this.meetingsAttended.textContent = `${meetingStats.attended} / ${meetingStats.total}`;
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+        }
     }
 
     formatDuration(seconds) {
+        if (!seconds || isNaN(seconds)) return '0:00';
         const hours = Math.floor(seconds / 3600);
         const minutes = Math.floor((seconds % 3600) / 60);
         return `${hours}:${minutes.toString().padStart(2, '0')}`;
@@ -156,10 +263,69 @@ class WorkLifeBalanceApp {
 
     formatLastBreak(timestamp) {
         if (!timestamp) return 'No breaks yet';
-        const minutes = Math.floor((Date.now() - timestamp) / 60000);
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        return `${Math.floor(minutes / 60)}h ${minutes % 60}m ago`;
+        try {
+            const breakTime = new Date(timestamp);
+            const now = new Date();
+            const minutes = Math.floor((now - breakTime) / 60000);
+            
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            const remainingMinutes = minutes % 60;
+            return `${hours}h ${remainingMinutes}m ago`;
+        } catch (error) {
+            console.error('Error formatting break time:', error);
+            return 'No breaks yet';
+        }
+    }
+
+    formatEventTime(time) {
+        try {
+            const date = new Date(time);
+            return date.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true
+            });
+        } catch (error) {
+            console.error('Error formatting event time:', error);
+            return time;
+        }
+    }
+
+    getEventStatus(event) {
+        const now = new Date();
+        const start = new Date(event.start);
+        const end = new Date(event.end);
+
+        if (end < now) return 'past';
+        if (start <= now && end >= now) return 'current';
+        return 'upcoming';
+    }
+
+    updateCalendarEvents(events) {
+        if (!events) {
+            this.eventsList.innerHTML = '<div class="event-item">Loading events...</div>';
+            return;
+        }
+        
+        if (!Array.isArray(events) || events.length === 0) {
+            this.eventsList.innerHTML = '<div class="event-item">No events scheduled</div>';
+            return;
+        }
+
+        this.eventsList.innerHTML = events.map(event => {
+            const status = this.getEventStatus(event);
+            const startTime = this.formatEventTime(event.start);
+            const endTime = this.formatEventTime(event.end);
+            
+            return `
+                <div class="event-item ${status} ${event.summary.toLowerCase().includes('break') ? 'break' : ''}">
+                    <span class="event-title">${event.summary}</span>
+                    <span class="event-time">${startTime} - ${endTime}</span>
+                </div>
+            `;
+        }).join('');
     }
 
     async handleBreak(accepted) {
@@ -218,9 +384,65 @@ class WorkLifeBalanceApp {
             this.handleBreak(true);
         }
     }
+
+    startDateTimeUpdates() {
+        // Start date/time updates immediately
+        this.updateDateTime();
+        setInterval(() => this.updateDateTime(), 1000);
+    }
+
+    updateDateTime() {
+        const now = new Date();
+        console.log('Updating date/time with:', now);
+        this.updateDateTimeDisplay(now);
+    }
+
+    updateDateTimeDisplay(date) {
+        if (!date) {
+            console.error('No date provided to updateDateTimeDisplay');
+            return;
+        }
+        
+        try {
+            if (this.currentDate) {
+                this.currentDate.textContent = date.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } else {
+                console.error('currentDate element not found');
+            }
+            
+            if (this.currentTime) {
+                this.currentTime.textContent = date.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+            } else {
+                console.error('currentTime element not found');
+            }
+        } catch (error) {
+            console.error('Error updating date/time display:', error);
+        }
+    }
 }
 
-// Initialize the application when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    window.app = new WorkLifeBalanceApp();
-}); 
+// Initialize the application
+let app;
+function initApp() {
+    if (!app) {
+        app = new WorkLifeBalanceApp();
+        window.app = app; // Export for debugging
+    }
+}
+
+// Ensure initialization happens after script loads
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+} 

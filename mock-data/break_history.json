@@ -63,6 +63,46 @@
       "completed": true,
       "effectiveness_rating": null,
       "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T18:05:40.310689+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T18:05:43.061938+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T18:05:49.110963+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T18:05:51.751702+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
+    },
+    {
+      "break_type": "user_initiated",
+      "timestamp": "2025-05-19T18:05:52.923389+01:00",
+      "accepted": true,
+      "completed": true,
+      "effectiveness_rating": null,
+      "energy_level_after": null
     }
   ]
 }

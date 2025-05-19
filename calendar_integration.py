@@ -16,11 +16,12 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class CalendarService:
-    def __init__(self, use_google_calendar: Optional[bool] = None):
+    def __init__(self, use_google_calendar: Optional[bool] = None, mock_time: Optional[datetime] = None):
         """
         Initialize the calendar service.
         Args:
             use_google_calendar: Override the config setting. If None, uses the config value.
+            mock_time: Optional mock time to use instead of real time
         """
         self.use_google_calendar = use_google_calendar if use_google_calendar is not None else Config.GOOGLE_CALENDAR_ENABLED
         self.google_calendar_service = None
@@ -29,16 +30,14 @@ class CalendarService:
         self.user_email = None
         self.timezone = Config.get_timezone()
         
-        # For local calendar, use a mocked time at 9 AM
-        if not self.use_google_calendar:
+        # Set up mock time
+        self.mock_current_time = mock_time
+        if not self.use_google_calendar and not self.mock_current_time:
             self.mock_current_time = datetime.now(self.timezone).replace(
                 hour=9, minute=0, second=0, microsecond=0
             )
-            logger.debug(f"Using mocked current time: {self.mock_current_time}")
-        else:
-            self.mock_current_time = None
         
-        logger.debug(f"Calendar Service initialized with: use_google_calendar={self.use_google_calendar}, local_file={self.local_calendar_file}")
+        logger.debug(f"Calendar Service initialized with: use_google_calendar={self.use_google_calendar}, mock_time={self.mock_current_time}")
         
         if self.use_google_calendar and Config.is_google_calendar_configured():
             self._setup_google_calendar()
@@ -89,9 +88,11 @@ class CalendarService:
         return self.user_email if self.use_google_calendar else None
     
     def get_current_time(self) -> datetime:
-        """Get the current time, using mock time if in local calendar mode."""
-        if self.mock_current_time and not self.use_google_calendar:
-            return self.mock_current_time
+        """Get the current time, using mock time if available."""
+        if self.mock_current_time:
+            # Add some time progression to mock time (1 minute per real minute)
+            elapsed = datetime.now(self.timezone) - self.mock_current_time
+            return self.mock_current_time + elapsed
         return datetime.now(self.timezone)
     
     def get_day_events(self, target_date: Optional[datetime] = None) -> List[Dict]:
