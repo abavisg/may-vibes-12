@@ -24,14 +24,19 @@ socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*", logger
 # Initialize scheduler with proper timezone
 scheduler = BackgroundScheduler(timezone=Config.get_timezone())
 
-# Set up mock time for testing (9 AM)
-mock_time = datetime.now(Config.get_timezone()).replace(
-    hour=9, minute=0, second=0, microsecond=0
-)
+# Set up mock time based on configuration
+mock_mode_enabled = Config.MOCKING_ENABLED
+if mock_mode_enabled:
+    mock_time = Config.get_mock_time()
+    logger.info(f"Mock mode enabled. Using mock time: {mock_time}")
+else:
+    mock_time = datetime.now(Config.get_timezone())
+    logger.info("Mock mode disabled. Using real time.")
 
 # Initialize services with mock time
-activity_tracker = ActivityTracker(idle_threshold_seconds=300, mock_time=mock_time)
-calendar_service = CalendarService(use_google_calendar=False, mock_time=mock_time)
+activity_tracker = ActivityTracker(idle_threshold_seconds=300, mock_time=mock_time if mock_mode_enabled else None)
+calendar_service = CalendarService(use_google_calendar=Config.USE_CALENDAR_INTEGRATION,
+                                  mock_time=mock_time if mock_mode_enabled else None)
 wellness_suggestions = WellnessSuggestions()
 wellness_score = WellnessScore()
 
@@ -117,13 +122,25 @@ def get_dashboard_data():
     activity_stats = activity_tracker.get_activity_stats()
     wellness_breakdown = wellness_score.get_score_breakdown()
     
+    # Check LLM status
+    try:
+        llm_status = wellness_suggestions.check_llm_status()
+    except Exception as e:
+        logger.error(f"Error checking LLM status: {e}")
+        llm_status = {
+            'is_available': False,
+            'model': 'Unknown',
+            'error': str(e)
+        }
+    
     return {
         'system_info': {
-            'mock_mode': True,  # Since we're using mock time
+            'mock_mode': mock_mode_enabled,
             'current_time': current_time.isoformat(),
             'is_active': activity_stats['is_active'],
             'formatted_date': current_time.strftime('%A, %B %d, %Y'),
-            'formatted_time': current_time.strftime('%I:%M:%S %p')
+            'formatted_time': current_time.strftime('%I:%M:%S %p'),
+            'llm_status': llm_status
         },
         'wellness_score': wellness_breakdown,
         'activity_stats': {
@@ -152,7 +169,7 @@ def index():
     current_time = calendar_service.get_current_time()
     formatted_date = current_time.strftime('%A, %B %d, %Y')
     formatted_time = current_time.strftime('%I:%M:%S %p')
-    is_mock_mode = True  # Since we're using mock time
+    is_mock_mode = mock_mode_enabled
     
     return render_template(
         'index.html',

@@ -3,6 +3,7 @@ import random
 from user_preferences import UserPreferences, BreakFeedback
 from ollama_client import OllamaClient
 import logging
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ class WellnessSuggestions:
         self.evening_start = time(17, 0)
         self.user_prefs = UserPreferences()
         self.ollama = OllamaClient()
+        self.last_break_check = datetime.now()
+        self.last_suggestion_time = None
 
         # Different types of breaks with their suggestions
         self.break_types = {
@@ -71,6 +74,44 @@ class WellnessSuggestions:
                 memory_score * memory_weight + 
                 idle_score * idle_weight)
 
+    def check_llm_status(self) -> dict:
+        """Check if the LLM is available and return its status"""
+        try:
+            # Try to ping the Ollama API
+            response = requests.get(f"{self.ollama.base_url}/api/tags", timeout=2)
+            response.raise_for_status()
+            
+            # Find our model in the response
+            models_data = response.json().get('models', [])
+            model_info = next((m for m in models_data if m.get('name') == self.ollama.model), None)
+            
+            if model_info:
+                return {
+                    'is_available': True,
+                    'model': self.ollama.model,
+                    'model_size': model_info.get('details', {}).get('parameter_size', 'Unknown'),
+                    'last_check': datetime.now().isoformat(),
+                    'last_suggestion': self.last_suggestion_time.isoformat() if self.last_suggestion_time else None,
+                    'check_interval': '5 minutes',
+                    'suggestion_threshold': '45 minutes of activity'
+                }
+            else:
+                return {
+                    'is_available': True,
+                    'model': self.ollama.model,
+                    'model_size': 'Unknown',
+                    'last_check': datetime.now().isoformat(),
+                    'note': 'Model loaded but details not found'
+                }
+                
+        except Exception as e:
+            return {
+                'is_available': False,
+                'error': str(e),
+                'last_check': datetime.now().isoformat(),
+                'model': self.ollama.model
+            }
+
     def get_break_suggestion(self, activity_stats: dict) -> dict:
         """
         Get personalized break suggestion based on current context
@@ -78,6 +119,7 @@ class WellnessSuggestions:
         Args:
             activity_stats: Dictionary containing activity statistics
         """
+        self.last_break_check = datetime.now()
         current_time = self.user_prefs.get_current_time()
         hour = current_time.hour
         
@@ -116,6 +158,7 @@ class WellnessSuggestions:
         
         # Get suggestion from Ollama
         suggestion = self.ollama.generate_break_suggestion(context)
+        self.last_suggestion_time = datetime.now()
         
         # Update break type weights based on suggestion
         self._update_break_weights(suggestion['type'])

@@ -23,9 +23,14 @@
                         <i class="fas fa-clock" style="color: #4a90e2;"></i>
                         <span style="font-weight: 500; color: #333;">{{ formatted_time }}</span>
                     </div>
-                    <div style="display: inline-flex; align-items: center; gap: 5px; background-color: #ffc107; color: #000; padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Show the accurate mock mode status with different colors -->
+                    <div id="mockIndicator" style="display: inline-flex; align-items: center; gap: 5px; {% if is_mock_mode %}background-color: #ffc107; color: #000;{% else %}background-color: #6c757d; color: white;{% endif %} padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                         <i class="fas fa-vial"></i>
-                        <span>Mock Mode</span>
+                        <span>Mock Mode: {% if is_mock_mode %}True{% else %}False{% endif %}</span>
+                    </div>
+                    <div id="llmStatus" style="display: inline-flex; align-items: center; gap: 5px; background-color: #4a90e2; color: white; padding: 3px 10px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <i class="fas fa-brain"></i>
+                        <span>LLM: Checking...</span>
                     </div>
                 </div>
                 

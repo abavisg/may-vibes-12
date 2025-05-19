@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 import pytz
+from datetime import datetime
 
 # Load environment variables from .env file
 env_path = Path('.') / '.env'
@@ -22,8 +23,13 @@ class Config:
     SECRETS_DIR = Path(os.getenv('SECRETS_DIR', 'secrets'))
     MOCK_DATA_DIR = Path(os.getenv('MOCK_DATA_DIR', 'mock-data'))
     
+    # Mocking Settings
+    MOCKING_ENABLED = os.getenv('MOCKING_ENABLED', 'true').lower() == 'true'
+    MOCKED_DATE = os.getenv('MOCKED_DATE', '2025-05-19')  # Format: YYYY-MM-DD
+    MOCKED_TIME = os.getenv('MOCKED_TIME', '09:00:00')    # Format: HH:MM:SS
+    
     # Google Calendar Settings
-    GOOGLE_CALENDAR_ENABLED = os.getenv('GOOGLE_CALENDAR_ENABLED', 'false').lower() == 'true'
+    USE_CALENDAR_INTEGRATION = os.getenv('USE_CALENDAR_INTEGRATION', 'false' if MOCKING_ENABLED else 'true').lower() == 'true'
     GOOGLE_CLIENT_SECRET_FILE = os.getenv('GOOGLE_CLIENT_SECRET_FILE', 'client_secret.json')
     GOOGLE_TOKEN_FILE = os.getenv('GOOGLE_TOKEN_FILE', 'token.json')
     GOOGLE_CALENDAR_ID = os.getenv('GOOGLE_CALENDAR_ID', 'primary')
@@ -44,6 +50,18 @@ class Config:
     
     # Local Calendar Settings
     LOCAL_CALENDAR_FILE = os.getenv('LOCAL_CALENDAR_FILE', 'local_calendar_current.json')
+    
+    @classmethod
+    def get_mock_time(cls) -> datetime:
+        """Get a datetime object based on the configured mock date and time."""
+        date_str = f"{cls.MOCKED_DATE} {cls.MOCKED_TIME}"
+        try:
+            # Parse the mock date and time, then localize to the configured timezone
+            naive_dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+            return cls.get_timezone().localize(naive_dt)
+        except Exception as e:
+            print(f"Error creating mock time: {e}. Using current time.")
+            return datetime.now(cls.get_timezone())
     
     @classmethod
     def get_oauth_redirect_uri(cls) -> str:
@@ -83,7 +101,7 @@ class Config:
         client_secret_exists = cls.get_client_secret_path().exists()
         if not client_secret_exists:
             print(f"Warning: {cls.GOOGLE_CLIENT_SECRET_FILE} not found in {cls.SECRETS_DIR}")
-        return cls.GOOGLE_CALENDAR_ENABLED and client_secret_exists
+        return cls.USE_CALENDAR_INTEGRATION and client_secret_exists
     
     @classmethod
     def get_timezone(cls) -> pytz.timezone:

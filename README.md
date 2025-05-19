@@ -36,6 +36,12 @@ A smart application that helps you maintain a healthy work-life balance by track
 1. Copy `credentials.json.example` to `credentials.json` and add your Google Calendar API credentials (optional)
 2. Adjust settings in `config.py` as needed
 3. The application uses port 5002 by default
+4. Environment variables can be set in a `.env` file:
+   - `MOCKING_ENABLED`: Set to "true" to enable mock mode (default: "true")
+   - `MOCKED_DATE`: Custom date for mock mode (format: YYYY-MM-DD)
+   - `MOCKED_TIME`: Custom time for mock mode (format: HH:MM:SS)
+   - `USE_CALENDAR_INTEGRATION`: Set to "true" to use Google Calendar (automatically set to "false" when MOCKING_ENABLED is "true")
+   - `TIMEZONE`: Your local timezone (default: "Europe/London")
 
 ## Usage
 
@@ -145,6 +151,8 @@ The application supports both local and Google Calendar integration:
 - Local calendar support for offline usage
 - All calendar operations are timezone-aware
 - Events are used to optimize break scheduling
+- Set `USE_CALENDAR_INTEGRATION=true` in `.env` to use Google Calendar
+- When `MOCKING_ENABLED=true`, mock calendar data is used automatically
 
 ## Contributing
 

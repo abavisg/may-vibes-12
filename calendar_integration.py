@@ -23,7 +23,7 @@ class CalendarService:
             use_google_calendar: Override the config setting. If None, uses the config value.
             mock_time: Optional mock time to use instead of real time
         """
-        self.use_google_calendar = use_google_calendar if use_google_calendar is not None else Config.GOOGLE_CALENDAR_ENABLED
+        self.use_google_calendar = use_google_calendar if use_google_calendar is not None else Config.USE_CALENDAR_INTEGRATION
         self.google_calendar_service = None
         self.local_calendar_file = Config.get_local_calendar_path()
         self.calendar_id = Config.GOOGLE_CALENDAR_ID
@@ -90,9 +90,15 @@ class CalendarService:
     def get_current_time(self) -> datetime:
         """Get the current time, using mock time if available."""
         if self.mock_current_time:
-            # Add some time progression to mock time (1 minute per real minute)
-            elapsed = datetime.now(self.timezone) - self.mock_current_time
-            return self.mock_current_time + elapsed
+            # When in mock mode, return the fixed mock time without progression
+            mock_now = self.mock_current_time
+            
+            # Ensure the datetime is timezone-aware
+            if mock_now.tzinfo is None:
+                mock_now = self.timezone.localize(mock_now)
+                
+            return mock_now
+            
         return datetime.now(self.timezone)
     
     def get_day_events(self, target_date: Optional[datetime] = None) -> List[Dict]:

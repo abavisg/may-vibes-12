@@ -5,11 +5,11 @@ from config import Config
 
 def test_calendar_integration():
     # Initialize calendar service using config
-    calendar = CalendarService()  # Will use Config.GOOGLE_CALENDAR_ENABLED
+    calendar = CalendarService()  # Will use Config.USE_CALENDAR_INTEGRATION
     
     # Print configuration
     print("\nConfiguration:")
-    print(f"Using Google Calendar: {Config.GOOGLE_CALENDAR_ENABLED}")
+    print(f"Using Calendar Integration: {Config.USE_CALENDAR_INTEGRATION}")
     print(f"Calendar ID: {Config.GOOGLE_CALENDAR_ID}")
     print(f"Timezone: {Config.TIMEZONE}")
     

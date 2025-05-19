@@ -151,8 +151,8 @@ class GoogleCalendarClient:
 def main():
     """Example usage of the GoogleCalendarClient."""
     try:
-        if not Config.GOOGLE_CALENDAR_ENABLED:
-            print("\nGoogle Calendar is not enabled. Please set GOOGLE_CALENDAR_ENABLED=true in your .env file.")
+        if not Config.USE_CALENDAR_INTEGRATION:
+            print("\nGoogle Calendar is not enabled. Please set USE_CALENDAR_INTEGRATION=true in your .env file.")
             return
             
         # Initialize and authenticate

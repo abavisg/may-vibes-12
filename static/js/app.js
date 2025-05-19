@@ -174,84 +174,103 @@ class WorkLifeBalanceApp {
 
     updateDashboard(data) {
         console.log('Updating dashboard with data:', data);
-        if (!data) {
-            console.error('No data provided to updateDashboard');
-            return;
-        }
+        if (!data) return;
 
-        try {
-            // Update system info
-            const systemInfo = data.system_info || {};
-            console.log('System info:', systemInfo);
+        // Update system info
+        const systemInfo = data.system_info || {};
+        console.log('System info:', systemInfo);
+        
+        // Update mock mode indicator
+        const mockIndicator = document.getElementById('mockIndicator');
+        if (mockIndicator) {
+            const isMockMode = !!systemInfo.mock_mode;
+            console.log('Setting mock mode:', isMockMode);
             
-            if (this.mockModeIndicator) {
-                const isMockMode = !!systemInfo.mock_mode;
-                console.log('Setting mock mode:', isMockMode);
-                this.mockModeIndicator.classList.toggle('hidden', !isMockMode);
-                console.log('Mock mode indicator visibility updated');
-            }
-
-            if (this.systemStatus) {
-                this.systemStatus.textContent = systemInfo.is_active ? 'System Active' : 'System Idle';
-                console.log('System status updated');
-            }
+            // Update text and style based on mock mode status
+            mockIndicator.querySelector('span').textContent = `Mock Mode: ${isMockMode ? 'True' : 'False'}`;
             
-            // Update date/time display
-            if (systemInfo.mock_mode && systemInfo.current_time) {
-                console.log('Using mock time:', systemInfo.current_time);
-                const mockDate = new Date(systemInfo.current_time);
-                if (!isNaN(mockDate.getTime())) {
-                    this.updateDateTimeDisplay(mockDate);
-                } else {
-                    console.error('Invalid mock time:', systemInfo.current_time);
-                }
+            if (isMockMode) {
+                mockIndicator.style.backgroundColor = '#ffc107'; // Yellow for mock mode
+                mockIndicator.style.color = '#000';
             } else {
-                console.log('Using real time');
-                this.updateDateTime();
+                mockIndicator.style.backgroundColor = '#6c757d'; // Gray for real mode
+                mockIndicator.style.color = 'white';
             }
-
-            // Update wellness score
-            if (this.scoreValue && data.wellness_score) {
-                this.scoreValue.textContent = Math.round(data.wellness_score.current_score);
-            }
-
-            // Update score components
-            this.scoreComponents.forEach(component => {
-                const name = component.dataset.component;
-                const value = data.wellness_score.components[name] || 0;
-                component.style.width = `${value}%`;
-            });
-
-            // Update suggestions
-            this.suggestionsList.innerHTML = data.wellness_score.suggestions
-                .map(suggestion => `<li>${suggestion}</li>`)
-                .join('') || '<li>No suggestions available</li>';
-
-            // Update system stats
-            const cpuPercent = Math.round(data.activity_stats.cpu_percent);
-            const memoryPercent = Math.round(data.activity_stats.memory_percent);
-            
-            this.cpuBar.style.width = `${cpuPercent}%`;
-            this.cpuUsage.textContent = `${cpuPercent}%`;
-            this.memoryBar.style.width = `${memoryPercent}%`;
-            this.memoryUsage.textContent = `${memoryPercent}%`;
-
-            // Update calendar events
-            this.updateCalendarEvents(data.calendar_events);
-
-            // Update break stats
-            const breakStats = data.break_stats;
-            this.breaksTaken.textContent = breakStats.taken;
-            this.breaksSuggested.textContent = breakStats.suggested;
-            this.workingTime.textContent = this.formatDuration(breakStats.working_time);
-            this.lastBreak.textContent = this.formatLastBreak(breakStats.last_break);
-
-            // Update meeting stats
-            const meetingStats = data.meeting_stats;
-            this.meetingsAttended.textContent = `${meetingStats.attended} / ${meetingStats.total}`;
-        } catch (error) {
-            console.error('Error updating dashboard:', error);
         }
+
+        if (this.systemStatus) {
+            this.systemStatus.textContent = systemInfo.is_active ? 'System Active' : 'System Idle';
+        }
+        
+        // Update LLM status
+        this.updateLlmStatus(systemInfo.llm_status);
+        
+        // Update date/time directly from server data if available
+        if (systemInfo.formatted_date && systemInfo.formatted_time) {
+            const dateElement = document.getElementById('currentDate');
+            const timeElement = document.getElementById('currentTime');
+            
+            if (dateElement) {
+                dateElement.textContent = systemInfo.formatted_date;
+                console.log('Updated date from server:', systemInfo.formatted_date);
+            }
+            
+            if (timeElement) {
+                timeElement.textContent = systemInfo.formatted_time;
+                console.log('Updated time from server:', systemInfo.formatted_time);
+            }
+        } 
+        // Fallback to client-side date formatting if server data not available
+        else if (systemInfo.mock_mode && systemInfo.current_time) {
+            console.log('Using mock time:', systemInfo.current_time);
+            const mockDate = new Date(systemInfo.current_time);
+            if (!isNaN(mockDate.getTime())) {
+                this.updateDateTimeDisplay(mockDate);
+            }
+        } else {
+            console.log('Using real time');
+            this.updateDateTime();
+        }
+
+        // Update wellness score
+        if (this.scoreValue && data.wellness_score) {
+            this.scoreValue.textContent = Math.round(data.wellness_score.current_score);
+        }
+
+        // Update score components
+        this.scoreComponents.forEach(component => {
+            const name = component.dataset.component;
+            const value = data.wellness_score.components[name] || 0;
+            component.style.width = `${value}%`;
+        });
+
+        // Update suggestions
+        this.suggestionsList.innerHTML = data.wellness_score.suggestions
+            .map(suggestion => `<li>${suggestion}</li>`)
+            .join('') || '<li>No suggestions available</li>';
+
+        // Update system stats
+        const cpuPercent = Math.round(data.activity_stats.cpu_percent);
+        const memoryPercent = Math.round(data.activity_stats.memory_percent);
+        
+        this.cpuBar.style.width = `${cpuPercent}%`;
+        this.cpuUsage.textContent = `${cpuPercent}%`;
+        this.memoryBar.style.width = `${memoryPercent}%`;
+        this.memoryUsage.textContent = `${memoryPercent}%`;
+
+        // Update calendar events
+        this.updateCalendarEvents(data.calendar_events);
+
+        // Update break stats
+        const breakStats = data.break_stats;
+        this.breaksTaken.textContent = breakStats.taken;
+        this.breaksSuggested.textContent = breakStats.suggested;
+        this.workingTime.textContent = this.formatDuration(breakStats.working_time);
+        this.lastBreak.textContent = this.formatLastBreak(breakStats.last_break);
+
+        // Update meeting stats
+        const meetingStats = data.meeting_stats;
+        this.meetingsAttended.textContent = `${meetingStats.attended} / ${meetingStats.total}`;
     }
 
     formatDuration(seconds) {
@@ -386,12 +405,25 @@ class WorkLifeBalanceApp {
     }
 
     startDateTimeUpdates() {
-        // Start date/time updates immediately
+        // Check if we're in mock mode
+        if (this.mockModeIndicator && !this.mockModeIndicator.classList.contains('hidden')) {
+            console.log('Mock mode detected, skipping client-side datetime updates');
+            return; // Skip client-side datetime updates if in mock mode
+        }
+        
+        // Only update time if not in mock mode
         this.updateDateTime();
         setInterval(() => this.updateDateTime(), 1000);
     }
 
     updateDateTime() {
+        // Don't update datetime if in mock mode
+        if (document.querySelector('.fa-vial') && 
+            !document.querySelector('.fa-vial').closest('div').classList.contains('hidden')) {
+            console.log('Mock mode detected, skipping client-side datetime update');
+            return;
+        }
+        
         const now = new Date();
         console.log('Updating date/time with:', now);
         this.updateDateTimeDisplay(now);
@@ -427,6 +459,47 @@ class WorkLifeBalanceApp {
             }
         } catch (error) {
             console.error('Error updating date/time display:', error);
+        }
+    }
+
+    updateLlmStatus(llmStatus) {
+        const llmStatusElement = document.getElementById('llmStatus');
+        if (!llmStatusElement) return;
+        
+        if (!llmStatus) {
+            llmStatusElement.innerHTML = `
+                <i class="fas fa-brain"></i>
+                <span>LLM: Unknown</span>
+            `;
+            llmStatusElement.style.backgroundColor = '#6c757d';
+            return;
+        }
+        
+        const isAvailable = llmStatus.is_available;
+        
+        if (isAvailable) {
+            const model = llmStatus.model || 'Unknown';
+            const modelSize = llmStatus.model_size || '';
+            const lastSuggestion = llmStatus.last_suggestion ? 
+                new Date(llmStatus.last_suggestion) : null;
+            
+            let suggestionTime = 'Never';
+            if (lastSuggestion) {
+                const minutes = Math.floor((new Date() - lastSuggestion) / 60000);
+                suggestionTime = minutes < 1 ? 'Just now' : `${minutes}m ago`;
+            }
+            
+            llmStatusElement.innerHTML = `
+                <i class="fas fa-brain"></i>
+                <span title="Last suggestion: ${suggestionTime}">LLM: ${model.split(':')[0]} ${modelSize}</span>
+            `;
+            llmStatusElement.style.backgroundColor = '#28a745';
+        } else {
+            llmStatusElement.innerHTML = `
+                <i class="fas fa-exclamation-triangle"></i>
+                <span>LLM: Unavailable</span>
+            `;
+            llmStatusElement.style.backgroundColor = '#dc3545';
         }
     }
 }
